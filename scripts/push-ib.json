@@ -1,0 +1,19 @@
+{
+    "items": [
+        {
+            "source": {
+                "type": "file",
+                "config": {
+                    "folder": "temp/data/connect/integrations"
+                }
+            },
+            "target": {
+                "type": "update",
+                "config": {
+                    "service": "connect",
+                    "collection": "integrations"
+                }
+            }
+        }
+    ]
+}

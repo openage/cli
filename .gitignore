@@ -1,0 +1,15 @@
+/node_modules
+/public/bower_components
+/public/public/bower_components
+/.idea
+/logs/*
+!/logs/*.txt
+/temp
+!/temp/*.txt
+/config/*
+!/config/default.json
+build.log
+/dist
+/.cache
+/.logs
+/.vscode/launch.json

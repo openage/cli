@@ -1,0 +1,23 @@
+{
+    "items": [
+        {
+            "code": "fetch-system-applications",
+            "name": "Fetch system applications",
+            "type": "pull",
+            "config": {
+                "remote": "search://system/applications",
+                "transforms": "details:system/applications|remove:id"
+            }
+        },
+        {
+            "code": "fetch-system-navs",
+            "name": "Fetch system navs",
+            "type": "pull",
+            "config": {
+                "remote": "search://system/navs",
+                "transforms": "details:system/navs|remove:id",
+                "local": "$cwd/{{remote.config.service}}/{{remote.config.collection}}/{{data.application.code}}"
+            }
+        }
+    ]
+}

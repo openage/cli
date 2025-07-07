@@ -1,0 +1,2587 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "version": "1.6.0",
+        "title": "system"
+    },
+    "host": "api.openage.in/system/v1",
+    "basePath": "/api",
+    "schemes": [],
+    "consumes": [
+        "application/json"
+    ],
+    "produces": [
+        "application/json"
+    ],
+    "paths": {
+        "/activities": {
+            "get": {
+                "permissions": [
+                    "tenant.user"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/activitiesPageRes"
+                        }
+                    }
+                },
+                "summary": "search",
+                "description": "searches in activities",
+                "operationId": "activities-search",
+                "tags": [
+                    "activities"
+                ]
+            },
+            "post": {
+                "permissions": [
+                    "tenant.user"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "body",
+                        "in": "body",
+                        "type": "object",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/activitiesReq"
+                        }
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/activitiesRes"
+                        }
+                    }
+                },
+                "summary": "create",
+                "description": "creates new item in activities",
+                "operationId": "activities-create",
+                "tags": [
+                    "activities"
+                ]
+            }
+        },
+        "/activities/{id}": {
+            "get": {
+                "permissions": [
+                    "tenant.user"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/activitiesRes"
+                        }
+                    }
+                },
+                "summary": "get",
+                "description": "gets an item by id in activities",
+                "operationId": "activities-get-by-id",
+                "tags": [
+                    "activities"
+                ]
+            },
+            "put": {
+                "permissions": [
+                    "tenant.user"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "name": "body",
+                        "in": "body",
+                        "type": "object",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/activitiesReq"
+                        }
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/activitiesRes"
+                        }
+                    }
+                },
+                "summary": "update",
+                "description": "updates an item in activities",
+                "operationId": "activities-update",
+                "tags": [
+                    "activities"
+                ]
+            },
+            "delete": {
+                "permissions": [
+                    "tenant.user"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/activitiesRes"
+                        }
+                    }
+                },
+                "summary": "remove",
+                "description": "removes an item in activities",
+                "operationId": "delete",
+                "tags": [
+                    "activities"
+                ]
+            }
+        },
+        "/applications": {
+            "get": {
+                "permissions": [
+                    "tenant.admin"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/applicationsPageRes"
+                        }
+                    }
+                },
+                "summary": "search",
+                "description": "searches in applications",
+                "operationId": "applications-search",
+                "tags": [
+                    "applications"
+                ]
+            },
+            "post": {
+                "permissions": [
+                    "tenant.admin"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "body",
+                        "in": "body",
+                        "type": "object",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/applicationsReq"
+                        }
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/applicationsRes"
+                        }
+                    }
+                },
+                "summary": "create",
+                "description": "creates new item in applications",
+                "operationId": "applications-create",
+                "tags": [
+                    "applications"
+                ]
+            }
+        },
+        "/applications/{id}": {
+            "get": {
+                "permissions": [
+                    "guest",
+                    "tenant.guest",
+                    "tenant.user"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "name": "x-tenant-code",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "application code"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/applicationsRes"
+                        }
+                    }
+                },
+                "summary": "get",
+                "description": "gets an item by id in applications",
+                "operationId": "applications-get-by-id",
+                "tags": [
+                    "applications"
+                ]
+            },
+            "put": {
+                "permissions": [
+                    "tenant.admin"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "name": "body",
+                        "in": "body",
+                        "type": "object",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/applicationsReq"
+                        }
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/applicationsRes"
+                        }
+                    }
+                },
+                "summary": "update",
+                "description": "updates an item in applications",
+                "operationId": "applications-update",
+                "tags": [
+                    "applications"
+                ]
+            },
+            "delete": {
+                "permissions": [
+                    "tenant.admin"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/applicationsRes"
+                        }
+                    }
+                },
+                "summary": "remove",
+                "description": "removes an item in applications",
+                "operationId": "delete",
+                "tags": [
+                    "applications"
+                ]
+            }
+        },
+        "/components": {
+            "get": {
+                "permissions": [
+                    "user"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/componentsPageRes"
+                        }
+                    }
+                },
+                "summary": "search",
+                "description": "searches in components",
+                "operationId": "components-search",
+                "tags": [
+                    "components"
+                ]
+            },
+            "post": {
+                "permissions": [
+                    "user"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "body",
+                        "in": "body",
+                        "type": "object",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/componentsReq"
+                        }
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/componentsRes"
+                        }
+                    }
+                },
+                "summary": "create",
+                "description": "creates new item in components",
+                "operationId": "components-create",
+                "tags": [
+                    "components"
+                ]
+            }
+        },
+        "/components/{id}": {
+            "get": {
+                "permissions": [
+                    "user"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/componentsRes"
+                        }
+                    }
+                },
+                "summary": "get",
+                "description": "gets an item by id in components",
+                "operationId": "components-get-by-id",
+                "tags": [
+                    "components"
+                ]
+            },
+            "put": {
+                "permissions": [
+                    "user"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "name": "body",
+                        "in": "body",
+                        "type": "object",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/componentsReq"
+                        }
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/componentsRes"
+                        }
+                    }
+                },
+                "summary": "update",
+                "description": "updates an item in components",
+                "operationId": "components-update",
+                "tags": [
+                    "components"
+                ]
+            }
+        },
+        "/logs": {
+            "get": {
+                "permissions": [
+                    "guest",
+                    "user"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/logsPageRes"
+                        }
+                    }
+                },
+                "summary": "search",
+                "description": "searches in logs",
+                "operationId": "logs-search",
+                "tags": [
+                    "logs"
+                ]
+            },
+            "post": {
+                "permissions": [
+                    "guest",
+                    "user"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "body",
+                        "in": "body",
+                        "type": "object",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/logsReq"
+                        }
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/logsRes"
+                        }
+                    }
+                },
+                "summary": "create",
+                "description": "creates new item in logs",
+                "operationId": "logs-create",
+                "tags": [
+                    "logs"
+                ]
+            }
+        },
+        "/logs/{id}": {
+            "get": {
+                "permissions": [
+                    "tenant.user"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/logsRes"
+                        }
+                    }
+                },
+                "summary": "get",
+                "description": "gets an item by id in logs",
+                "operationId": "logs-get-by-id",
+                "tags": [
+                    "logs"
+                ]
+            }
+        },
+        "/navs": {
+            "get": {
+                "permissions": [
+                    "tenant.admin"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/navsPageRes"
+                        }
+                    }
+                },
+                "summary": "search",
+                "description": "searches in navs",
+                "operationId": "navs-search",
+                "tags": [
+                    "navs"
+                ]
+            },
+            "post": {
+                "permissions": [
+                    "tenant.admin"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "body",
+                        "in": "body",
+                        "type": "object",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/navsReq"
+                        }
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/navsRes"
+                        }
+                    }
+                },
+                "summary": "create",
+                "description": "creates new item in navs",
+                "operationId": "navs-create",
+                "tags": [
+                    "navs"
+                ]
+            }
+        },
+        "/navs/{id}": {
+            "get": {
+                "permissions": [
+                    "tenant.admin"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/navsRes"
+                        }
+                    }
+                },
+                "summary": "get",
+                "description": "gets an item by id in navs",
+                "operationId": "navs-get-by-id",
+                "tags": [
+                    "navs"
+                ]
+            },
+            "put": {
+                "permissions": [
+                    "tenant.admin"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "name": "body",
+                        "in": "body",
+                        "type": "object",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/navsReq"
+                        }
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/navsRes"
+                        }
+                    }
+                },
+                "summary": "update",
+                "description": "updates an item in navs",
+                "operationId": "navs-update",
+                "tags": [
+                    "navs"
+                ]
+            },
+            "delete": {
+                "permissions": [
+                    "tenant.admin"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/navsRes"
+                        }
+                    }
+                },
+                "summary": "remove",
+                "description": "removes an item in navs",
+                "operationId": "delete",
+                "tags": [
+                    "navs"
+                ]
+            }
+        },
+        "/organizations": {
+            "get": {
+                "permissions": [
+                    "tenant.user"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/organizationsPageRes"
+                        }
+                    }
+                },
+                "summary": "search",
+                "description": "searches in organizations",
+                "operationId": "organizations-search",
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "post": {
+                "permissions": [
+                    "tenant.user"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "body",
+                        "in": "body",
+                        "type": "object",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/organizationsReq"
+                        }
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/organizationsRes"
+                        }
+                    }
+                },
+                "summary": "create",
+                "description": "creates new item in organizations",
+                "operationId": "organizations-create",
+                "tags": [
+                    "organizations"
+                ]
+            }
+        },
+        "/organizations/{id}": {
+            "get": {
+                "permissions": [
+                    "organization.user",
+                    "tenant.admin"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/organizationsRes"
+                        }
+                    }
+                },
+                "summary": "get",
+                "description": "gets an item by id in organizations",
+                "operationId": "organizations-get-by-id",
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "put": {
+                "permissions": [
+                    "organization.admin",
+                    "tenant.admin"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "name": "body",
+                        "in": "body",
+                        "type": "object",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/organizationsReq"
+                        }
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/organizationsRes"
+                        }
+                    }
+                },
+                "summary": "update",
+                "description": "updates an item in organizations",
+                "operationId": "organizations-update",
+                "tags": [
+                    "organizations"
+                ]
+            },
+            "delete": {
+                "permissions": [
+                    "organization.admin",
+                    "tenant.admin"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/organizationsRes"
+                        }
+                    }
+                },
+                "summary": "remove",
+                "description": "removes an item in organizations",
+                "operationId": "delete",
+                "tags": [
+                    "organizations"
+                ]
+            }
+        },
+        "/servers": {
+            "get": {
+                "permissions": [
+                    "user"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/serversPageRes"
+                        }
+                    }
+                },
+                "summary": "search",
+                "description": "searches in servers",
+                "operationId": "servers-search",
+                "tags": [
+                    "servers"
+                ]
+            },
+            "post": {
+                "permissions": [
+                    "user"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "body",
+                        "in": "body",
+                        "type": "object",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/serversReq"
+                        }
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/serversRes"
+                        }
+                    }
+                },
+                "summary": "create",
+                "description": "creates new item in servers",
+                "operationId": "servers-create",
+                "tags": [
+                    "servers"
+                ]
+            }
+        },
+        "/servers/{id}": {
+            "get": {
+                "permissions": [
+                    "user"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/serversRes"
+                        }
+                    }
+                },
+                "summary": "get",
+                "description": "gets an item by id in servers",
+                "operationId": "servers-get-by-id",
+                "tags": [
+                    "servers"
+                ]
+            },
+            "put": {
+                "permissions": [
+                    "user"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "name": "body",
+                        "in": "body",
+                        "type": "object",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/serversReq"
+                        }
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/serversRes"
+                        }
+                    }
+                },
+                "summary": "update",
+                "description": "updates an item in servers",
+                "operationId": "servers-update",
+                "tags": [
+                    "servers"
+                ]
+            }
+        },
+        "/settings": {
+            "get": {
+                "permissions": [
+                    "tenant.user",
+                    "tenant.admin"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/settingsPageRes"
+                        }
+                    }
+                },
+                "summary": "search",
+                "description": "searches in settings",
+                "operationId": "settings-search",
+                "tags": [
+                    "settings"
+                ]
+            },
+            "post": {
+                "permissions": [
+                    "tenant.admin"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "body",
+                        "in": "body",
+                        "type": "object",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/settingsReq"
+                        }
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/settingsRes"
+                        }
+                    }
+                },
+                "summary": "create",
+                "description": "creates new item in settings",
+                "operationId": "settings-create",
+                "tags": [
+                    "settings"
+                ]
+            }
+        },
+        "/settings/{id}": {
+            "get": {
+                "permissions": [
+                    "tenant.user",
+                    "tenant.admin"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/settingsRes"
+                        }
+                    }
+                },
+                "summary": "get",
+                "description": "gets an item by id in settings",
+                "operationId": "settings-get-by-id",
+                "tags": [
+                    "settings"
+                ]
+            },
+            "put": {
+                "permissions": [
+                    "tenant.admin"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "name": "body",
+                        "in": "body",
+                        "type": "object",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/settingsReq"
+                        }
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/settingsRes"
+                        }
+                    }
+                },
+                "summary": "update",
+                "description": "updates an item in settings",
+                "operationId": "settings-update",
+                "tags": [
+                    "settings"
+                ]
+            },
+            "delete": {
+                "permissions": [
+                    "tenant.admin"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/settingsRes"
+                        }
+                    }
+                },
+                "summary": "remove",
+                "description": "removes an item in settings",
+                "operationId": "delete",
+                "tags": [
+                    "settings"
+                ]
+            }
+        },
+        "/settings/{id}/migrate": {
+            "post": {
+                "id": "migrate",
+                "method": "migrate",
+                "permissions": [
+                    "tenant.admin"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "name": "body",
+                        "in": "body",
+                        "type": "object",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/settingsReq"
+                        }
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/settingsRes"
+                        }
+                    }
+                },
+                "summary": "",
+                "description": "",
+                "operationId": "migrate",
+                "tags": [
+                    "settings"
+                ]
+            }
+        },
+        "/taskTemplates": {
+            "get": {
+                "permissions": [
+                    "user"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/taskTemplatesPageRes"
+                        }
+                    }
+                },
+                "summary": "search",
+                "description": "searches in taskTemplates",
+                "operationId": "taskTemplates-search",
+                "tags": [
+                    "taskTemplates"
+                ]
+            },
+            "post": {
+                "permissions": [
+                    "user"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "body",
+                        "in": "body",
+                        "type": "object",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/taskTemplatesReq"
+                        }
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/taskTemplatesRes"
+                        }
+                    }
+                },
+                "summary": "create",
+                "description": "creates new item in taskTemplates",
+                "operationId": "taskTemplates-create",
+                "tags": [
+                    "taskTemplates"
+                ]
+            }
+        },
+        "/taskTemplates/{id}": {
+            "get": {
+                "permissions": [
+                    "user"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/taskTemplatesRes"
+                        }
+                    }
+                },
+                "summary": "get",
+                "description": "gets an item by id in taskTemplates",
+                "operationId": "taskTemplates-get-by-id",
+                "tags": [
+                    "taskTemplates"
+                ]
+            },
+            "put": {
+                "permissions": [
+                    "user"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "name": "body",
+                        "in": "body",
+                        "type": "object",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/taskTemplatesReq"
+                        }
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/taskTemplatesRes"
+                        }
+                    }
+                },
+                "summary": "update",
+                "description": "updates an item in taskTemplates",
+                "operationId": "taskTemplates-update",
+                "tags": [
+                    "taskTemplates"
+                ]
+            }
+        },
+        "/tasks": {
+            "get": {
+                "permissions": [
+                    "user"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/tasksPageRes"
+                        }
+                    }
+                },
+                "summary": "search",
+                "description": "searches in tasks",
+                "operationId": "tasks-search",
+                "tags": [
+                    "tasks"
+                ]
+            },
+            "post": {
+                "permissions": [
+                    "user"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "body",
+                        "in": "body",
+                        "type": "object",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/tasksReq"
+                        }
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/tasksRes"
+                        }
+                    }
+                },
+                "summary": "create",
+                "description": "creates new item in tasks",
+                "operationId": "tasks-create",
+                "tags": [
+                    "tasks"
+                ]
+            }
+        },
+        "/tasks/{id}": {
+            "get": {
+                "permissions": [
+                    "user"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/tasksRes"
+                        }
+                    }
+                },
+                "summary": "get",
+                "description": "gets an item by id in tasks",
+                "operationId": "tasks-get-by-id",
+                "tags": [
+                    "tasks"
+                ]
+            },
+            "put": {
+                "permissions": [
+                    "user"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "name": "body",
+                        "in": "body",
+                        "type": "object",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/tasksReq"
+                        }
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/tasksRes"
+                        }
+                    }
+                },
+                "summary": "update",
+                "description": "updates an item in tasks",
+                "operationId": "tasks-update",
+                "tags": [
+                    "tasks"
+                ]
+            }
+        },
+        "/tenants/{id}": {
+            "get": {
+                "permissions": [
+                    "tenant.admin"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/tenantsRes"
+                        }
+                    }
+                },
+                "summary": "get",
+                "description": "gets an item by id in tenants",
+                "operationId": "tenants-get-by-id",
+                "tags": [
+                    "tenants"
+                ]
+            },
+            "put": {
+                "permissions": [
+                    "tenant.admin"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "name": "body",
+                        "in": "body",
+                        "type": "object",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/tenantsReq"
+                        }
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/tenantsRes"
+                        }
+                    }
+                },
+                "summary": "update",
+                "description": "updates an item in tenants",
+                "operationId": "tenants-update",
+                "tags": [
+                    "tenants"
+                ]
+            }
+        },
+        "/users/{id}": {
+            "get": {
+                "permissions": [
+                    "user"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/usersRes"
+                        }
+                    }
+                },
+                "summary": "get",
+                "description": "gets an item by id in users",
+                "operationId": "users-get-by-id",
+                "tags": [
+                    "users"
+                ]
+            },
+            "put": {
+                "permissions": [
+                    "user"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "name": "body",
+                        "in": "body",
+                        "type": "object",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/usersReq"
+                        }
+                    },
+                    {
+                        "name": "x-role-key",
+                        "in": "header",
+                        "type": "string",
+                        "required": true,
+                        "description": "user role key"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "schema": {
+                            "$ref": "#/definitions/usersRes"
+                        }
+                    }
+                },
+                "summary": "update",
+                "description": "updates an item in users",
+                "operationId": "users-update",
+                "tags": [
+                    "users"
+                ]
+            }
+        }
+    },
+    "definitions": {
+        "organizationsReq": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "organizationsRes": {
+            "type": "object",
+            "properties": {
+                "isSuccess": {
+                    "type": "boolean",
+                    "description": "true"
+                },
+                "error": {
+                    "type": "string",
+                    "description": "error details"
+                },
+                "message": {
+                    "type": "string",
+                    "description": "validation message"
+                },
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "id": {
+                            "type": "string"
+                        },
+                        "code": {
+                            "type": "string"
+                        },
+                        "name": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "organizationsPageRes": {
+            "type": "object",
+            "properties": {
+                "isSuccess": {
+                    "type": "boolean",
+                    "description": "true"
+                },
+                "error": {
+                    "type": "string",
+                    "description": "error details"
+                },
+                "message": {
+                    "type": "string",
+                    "description": "validation message"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "code": {
+                                "type": "string"
+                            },
+                            "name": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "profilesReq": {
+            "type": "object",
+            "properties": {
+                "firstName": {
+                    "type": "string"
+                },
+                "lastName": {
+                    "type": "string"
+                },
+                "dob": {
+                    "type": "string"
+                },
+                "gender": {
+                    "type": "string"
+                },
+                "pic": {
+                    "type": "object",
+                    "properties": {
+                        "url": {
+                            "type": "string"
+                        },
+                        "thumbnail": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "profilesRes": {
+            "type": "object",
+            "properties": {
+                "isSuccess": {
+                    "type": "boolean",
+                    "description": "true"
+                },
+                "error": {
+                    "type": "string",
+                    "description": "error details"
+                },
+                "message": {
+                    "type": "string",
+                    "description": "validation message"
+                },
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "firstName": {
+                            "type": "string"
+                        },
+                        "lastName": {
+                            "type": "string"
+                        },
+                        "dob": {
+                            "type": "string"
+                        },
+                        "gender": {
+                            "type": "string"
+                        },
+                        "pic": {
+                            "type": "object",
+                            "properties": {
+                                "url": {
+                                    "type": "string"
+                                },
+                                "thumbnail": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "profilesPageRes": {
+            "type": "object",
+            "properties": {
+                "isSuccess": {
+                    "type": "boolean",
+                    "description": "true"
+                },
+                "error": {
+                    "type": "string",
+                    "description": "error details"
+                },
+                "message": {
+                    "type": "string",
+                    "description": "validation message"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "firstName": {
+                                "type": "string"
+                            },
+                            "lastName": {
+                                "type": "string"
+                            },
+                            "dob": {
+                                "type": "string"
+                            },
+                            "gender": {
+                                "type": "string"
+                            },
+                            "pic": {
+                                "type": "object",
+                                "properties": {
+                                    "url": {
+                                        "type": "string"
+                                    },
+                                    "thumbnail": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "rolesReq": {
+            "type": "object",
+            "properties": {}
+        },
+        "rolesRes": {
+            "type": "object",
+            "properties": {
+                "isSuccess": {
+                    "type": "boolean",
+                    "description": "true"
+                },
+                "error": {
+                    "type": "string",
+                    "description": "error details"
+                },
+                "message": {
+                    "type": "string",
+                    "description": "validation message"
+                },
+                "data": {
+                    "type": "object",
+                    "properties": {}
+                }
+            }
+        },
+        "rolesPageRes": {
+            "type": "object",
+            "properties": {
+                "isSuccess": {
+                    "type": "boolean",
+                    "description": "true"
+                },
+                "error": {
+                    "type": "string",
+                    "description": "error details"
+                },
+                "message": {
+                    "type": "string",
+                    "description": "validation message"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {}
+                    }
+                }
+            }
+        },
+        "tenantsReq": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "tenantsRes": {
+            "type": "object",
+            "properties": {
+                "isSuccess": {
+                    "type": "boolean",
+                    "description": "true"
+                },
+                "error": {
+                    "type": "string",
+                    "description": "error details"
+                },
+                "message": {
+                    "type": "string",
+                    "description": "validation message"
+                },
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "id": {
+                            "type": "string"
+                        },
+                        "code": {
+                            "type": "string"
+                        },
+                        "name": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "tenantsPageRes": {
+            "type": "object",
+            "properties": {
+                "isSuccess": {
+                    "type": "boolean",
+                    "description": "true"
+                },
+                "error": {
+                    "type": "string",
+                    "description": "error details"
+                },
+                "message": {
+                    "type": "string",
+                    "description": "validation message"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "code": {
+                                "type": "string"
+                            },
+                            "name": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "usersReq": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "profile": {
+                    "type": "object",
+                    "properties": {
+                        "firstName": {
+                            "type": "string"
+                        },
+                        "lastName": {
+                            "type": "string"
+                        },
+                        "dob": {
+                            "type": "string"
+                        },
+                        "gender": {
+                            "type": "string"
+                        },
+                        "pic": {
+                            "type": "object",
+                            "properties": {
+                                "url": {
+                                    "type": "string"
+                                },
+                                "thumbnail": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "role": {
+                    "type": "object",
+                    "properties": {}
+                }
+            }
+        },
+        "usersRes": {
+            "type": "object",
+            "properties": {
+                "isSuccess": {
+                    "type": "boolean",
+                    "description": "true"
+                },
+                "error": {
+                    "type": "string",
+                    "description": "error details"
+                },
+                "message": {
+                    "type": "string",
+                    "description": "validation message"
+                },
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "id": {
+                            "type": "string"
+                        },
+                        "code": {
+                            "type": "string"
+                        },
+                        "status": {
+                            "type": "string"
+                        },
+                        "email": {
+                            "type": "string"
+                        },
+                        "phone": {
+                            "type": "string"
+                        },
+                        "profile": {
+                            "type": "object",
+                            "properties": {
+                                "firstName": {
+                                    "type": "string"
+                                },
+                                "lastName": {
+                                    "type": "string"
+                                },
+                                "dob": {
+                                    "type": "string"
+                                },
+                                "gender": {
+                                    "type": "string"
+                                },
+                                "pic": {
+                                    "type": "object",
+                                    "properties": {
+                                        "url": {
+                                            "type": "string"
+                                        },
+                                        "thumbnail": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "role": {
+                            "type": "object",
+                            "properties": {}
+                        }
+                    }
+                }
+            }
+        },
+        "usersPageRes": {
+            "type": "object",
+            "properties": {
+                "isSuccess": {
+                    "type": "boolean",
+                    "description": "true"
+                },
+                "error": {
+                    "type": "string",
+                    "description": "error details"
+                },
+                "message": {
+                    "type": "string",
+                    "description": "validation message"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "code": {
+                                "type": "string"
+                            },
+                            "status": {
+                                "type": "string"
+                            },
+                            "email": {
+                                "type": "string"
+                            },
+                            "phone": {
+                                "type": "string"
+                            },
+                            "profile": {
+                                "type": "object",
+                                "properties": {
+                                    "firstName": {
+                                        "type": "string"
+                                    },
+                                    "lastName": {
+                                        "type": "string"
+                                    },
+                                    "dob": {
+                                        "type": "string"
+                                    },
+                                    "gender": {
+                                        "type": "string"
+                                    },
+                                    "pic": {
+                                        "type": "object",
+                                        "properties": {
+                                            "url": {
+                                                "type": "string"
+                                            },
+                                            "thumbnail": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            "role": {
+                                "type": "object",
+                                "properties": {}
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

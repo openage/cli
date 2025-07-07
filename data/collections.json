@@ -1,0 +1,19 @@
+{
+    "items": [
+        {
+            "code": "directory",
+            "items": [
+                "roleTypes",
+                "roleGroups"
+            ]
+        },
+        {
+            "code": "composer",
+            "items": [
+                "tenants",
+                "tasks",
+                "task-templates"
+            ]
+        }
+    ]
+}

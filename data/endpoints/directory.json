@@ -1,0 +1,1371 @@
+[
+  {
+    "name": "search batches",
+    "value": {
+      "collection": "batches",
+      "method": "get",
+      "path": "/batches",
+      "permissions": [
+        "organization.user"
+      ]
+    }
+  },
+  {
+    "name": "create batches",
+    "value": {
+      "collection": "batches",
+      "method": "post",
+      "path": "/batches",
+      "permissions": [
+        "organization.admin"
+      ]
+    }
+  },
+  {
+    "name": "bulk create batches",
+    "value": {
+      "collection": "batches",
+      "method": "post",
+      "path": "/batches/bulk",
+      "permissions": [
+        "organization.admin"
+      ]
+    }
+  },
+  {
+    "name": "get batches",
+    "value": {
+      "collection": "batches",
+      "method": "get",
+      "path": "/batches/{id}",
+      "permissions": [
+        "organization.user"
+      ]
+    }
+  },
+  {
+    "name": "update batches",
+    "value": {
+      "collection": "batches",
+      "method": "put",
+      "path": "/batches/{id}",
+      "permissions": [
+        "organization.admin"
+      ]
+    }
+  },
+  {
+    "name": "remove batches",
+    "value": {
+      "collection": "batches",
+      "method": "delete",
+      "path": "/batches/{id}",
+      "permissions": [
+        "organization.admin"
+      ]
+    }
+  },
+  {
+    "name": "search contractors",
+    "value": {
+      "collection": "contractors",
+      "method": "get",
+      "path": "/contractors",
+      "permissions": [
+        "organization.user"
+      ]
+    }
+  },
+  {
+    "name": "create contractors",
+    "value": {
+      "collection": "contractors",
+      "method": "post",
+      "path": "/contractors",
+      "permissions": [
+        "organization.admin"
+      ]
+    }
+  },
+  {
+    "name": "bulk create contractors",
+    "value": {
+      "collection": "contractors",
+      "method": "post",
+      "path": "/contractors/bulk",
+      "permissions": [
+        "organization.admin"
+      ]
+    }
+  },
+  {
+    "name": "get contractors",
+    "value": {
+      "collection": "contractors",
+      "method": "get",
+      "path": "/contractors/{id}",
+      "permissions": [
+        "organization.user"
+      ]
+    }
+  },
+  {
+    "name": "update contractors",
+    "value": {
+      "collection": "contractors",
+      "method": "put",
+      "path": "/contractors/{id}",
+      "permissions": [
+        "organization.admin"
+      ]
+    }
+  },
+  {
+    "name": "remove contractors",
+    "value": {
+      "collection": "contractors",
+      "method": "delete",
+      "path": "/contractors/{id}",
+      "permissions": [
+        "organization.admin"
+      ]
+    }
+  },
+  {
+    "name": "search courses",
+    "value": {
+      "collection": "courses",
+      "method": "get",
+      "path": "/courses",
+      "permissions": [
+        "organization.user"
+      ]
+    }
+  },
+  {
+    "name": "create courses",
+    "value": {
+      "collection": "courses",
+      "method": "post",
+      "path": "/courses",
+      "permissions": [
+        "organization.admin"
+      ]
+    }
+  },
+  {
+    "name": "bulk create courses",
+    "value": {
+      "collection": "courses",
+      "method": "post",
+      "path": "/courses/bulk",
+      "permissions": [
+        "organization.admin"
+      ]
+    }
+  },
+  {
+    "name": "get courses",
+    "value": {
+      "collection": "courses",
+      "method": "get",
+      "path": "/courses/{id}",
+      "permissions": [
+        "organization.user"
+      ]
+    }
+  },
+  {
+    "name": "update courses",
+    "value": {
+      "collection": "courses",
+      "method": "put",
+      "path": "/courses/{id}",
+      "permissions": [
+        "organization.admin"
+      ]
+    }
+  },
+  {
+    "name": "remove courses",
+    "value": {
+      "collection": "courses",
+      "method": "delete",
+      "path": "/courses/{id}",
+      "permissions": [
+        "organization.admin"
+      ]
+    }
+  },
+  {
+    "name": "search departments",
+    "value": {
+      "collection": "departments",
+      "method": "get",
+      "path": "/departments",
+      "permissions": [
+        "organization.user",
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "create departments",
+    "value": {
+      "collection": "departments",
+      "method": "post",
+      "path": "/departments",
+      "permissions": [
+        "organization.admin"
+      ]
+    }
+  },
+  {
+    "name": "bulk create departments",
+    "value": {
+      "collection": "departments",
+      "method": "post",
+      "path": "/departments/bulk",
+      "permissions": [
+        "organization.admin"
+      ]
+    }
+  },
+  {
+    "name": "get departments",
+    "value": {
+      "collection": "departments",
+      "method": "get",
+      "path": "/departments/{id}",
+      "permissions": [
+        "organization.user"
+      ]
+    }
+  },
+  {
+    "name": "update departments",
+    "value": {
+      "collection": "departments",
+      "method": "put",
+      "path": "/departments/{id}",
+      "permissions": [
+        "organization.admin"
+      ]
+    }
+  },
+  {
+    "name": "remove departments",
+    "value": {
+      "collection": "departments",
+      "method": "delete",
+      "path": "/departments/{id}",
+      "permissions": [
+        "organization.admin"
+      ]
+    }
+  },
+  {
+    "name": "create dependents",
+    "value": {
+      "collection": "dependents",
+      "method": "post",
+      "path": "/dependents",
+      "permissions": [
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "bulk create dependents",
+    "value": {
+      "collection": "dependents",
+      "method": "post",
+      "path": "/dependents/bulk",
+      "permissions": [
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "search designations",
+    "value": {
+      "collection": "designations",
+      "method": "get",
+      "path": "/designations",
+      "permissions": [
+        "organization.user",
+        "customer.view",
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "create designations",
+    "value": {
+      "collection": "designations",
+      "method": "post",
+      "path": "/designations",
+      "permissions": [
+        "organization.admin"
+      ]
+    }
+  },
+  {
+    "name": "bulk create designations",
+    "value": {
+      "collection": "designations",
+      "method": "post",
+      "path": "/designations/bulk",
+      "permissions": [
+        "organization.admin"
+      ]
+    }
+  },
+  {
+    "name": "get designations",
+    "value": {
+      "collection": "designations",
+      "method": "get",
+      "path": "/designations/{id}",
+      "permissions": [
+        "organization.user"
+      ]
+    }
+  },
+  {
+    "name": "update designations",
+    "value": {
+      "collection": "designations",
+      "method": "put",
+      "path": "/designations/{id}",
+      "permissions": [
+        "organization.admin"
+      ]
+    }
+  },
+  {
+    "name": "remove designations",
+    "value": {
+      "collection": "designations",
+      "method": "delete",
+      "path": "/designations/{id}",
+      "permissions": [
+        "organization.admin"
+      ]
+    }
+  },
+  {
+    "name": "search divisions",
+    "value": {
+      "collection": "divisions",
+      "method": "get",
+      "path": "/divisions",
+      "permissions": [
+        "organization.user",
+        "organization.admin",
+        "tenant.admin"
+      ]
+    }
+  },
+  {
+    "name": "create divisions",
+    "value": {
+      "collection": "divisions",
+      "method": "post",
+      "path": "/divisions",
+      "permissions": [
+        "organization.admin",
+        "tenant.admin"
+      ]
+    }
+  },
+  {
+    "name": "bulk create divisions",
+    "value": {
+      "collection": "divisions",
+      "method": "post",
+      "path": "/divisions/bulk",
+      "permissions": [
+        "organization.admin"
+      ]
+    }
+  },
+  {
+    "name": "get divisions",
+    "value": {
+      "collection": "divisions",
+      "method": "get",
+      "path": "/divisions/{id}",
+      "permissions": [
+        "organization.user",
+        "organization.admin",
+        "tenant.admin"
+      ]
+    }
+  },
+  {
+    "name": "update divisions",
+    "value": {
+      "collection": "divisions",
+      "method": "put",
+      "path": "/divisions/{id}",
+      "permissions": [
+        "organization.admin",
+        "tenant.admin"
+      ]
+    }
+  },
+  {
+    "name": "remove divisions",
+    "value": {
+      "collection": "divisions",
+      "method": "delete",
+      "path": "/divisions/{id}",
+      "permissions": [
+        "organization.admin",
+        "tenant.admin"
+      ]
+    }
+  },
+  {
+    "name": "search employees",
+    "value": {
+      "collection": "employees",
+      "method": "get",
+      "path": "/employees",
+      "permissions": []
+    }
+  },
+  {
+    "name": "create employees",
+    "value": {
+      "collection": "employees",
+      "method": "post",
+      "path": "/employees",
+      "permissions": []
+    }
+  },
+  {
+    "name": "exists employees",
+    "value": {
+      "collection": "employees",
+      "method": "get",
+      "path": "/employees/exists",
+      "permissions": [
+        "organization.guest",
+        "organization.user",
+        "tenant.admin"
+      ]
+    }
+  },
+  {
+    "name": "bulk create employees",
+    "value": {
+      "collection": "employees",
+      "method": "post",
+      "path": "/employees/bulk",
+      "permissions": [
+        "organization.admin",
+        "tenant.admin"
+      ]
+    }
+  },
+  {
+    "name": "get employees",
+    "value": {
+      "collection": "employees",
+      "method": "get",
+      "path": "/employees/{id}",
+      "permissions": []
+    }
+  },
+  {
+    "name": "update employees",
+    "value": {
+      "collection": "employees",
+      "method": "put",
+      "path": "/employees/{id}",
+      "permissions": []
+    }
+  },
+  {
+    "name": "remove employees",
+    "value": {
+      "collection": "employees",
+      "method": "delete",
+      "path": "/employees/{id}",
+      "permissions": []
+    }
+  },
+  {
+    "name": "search organizations",
+    "value": {
+      "collection": "organizations",
+      "method": "get",
+      "path": "/organizations",
+      "permissions": [
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "create organizations",
+    "value": {
+      "collection": "organizations",
+      "method": "post",
+      "path": "/organizations",
+      "permissions": [
+        "tenant.guest",
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "bulk create organizations",
+    "value": {
+      "collection": "organizations",
+      "method": "post",
+      "path": "/organizations/bulk",
+      "permissions": [
+        "tenant.admin",
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "summary by code organizations",
+    "value": {
+      "collection": "organizations",
+      "method": "get",
+      "path": "/organizations/{code}/summary",
+      "permissions": [
+        "tenant.guest",
+        "organization.admin",
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "to sync organizaion with other ms organizations",
+    "value": {
+      "collection": "organizations",
+      "method": "get",
+      "path": "/organizations/sync",
+      "permissions": [
+        "tenant.admin"
+      ]
+    }
+  },
+  {
+    "name": "exists organizations",
+    "value": {
+      "collection": "organizations",
+      "method": "post",
+      "path": "/organizations/isAvailable",
+      "permissions": [
+        "tenant.user",
+        "organization.admin",
+        "tenant.guest"
+      ]
+    }
+  },
+  {
+    "name": "get organizations",
+    "value": {
+      "collection": "organizations",
+      "method": "get",
+      "path": "/organizations/{id}",
+      "permissions": [
+        "organization.user",
+        "tenant.organization.get",
+        "organization.admin",
+        "tenant.admin"
+      ]
+    }
+  },
+  {
+    "name": "update organizations",
+    "value": {
+      "collection": "organizations",
+      "method": "put",
+      "path": "/organizations/{id}",
+      "permissions": [
+        "tenant.organization.update",
+        "organization.admin",
+        "tenant.admin"
+      ]
+    }
+  },
+  {
+    "name": "remove organizations",
+    "value": {
+      "collection": "organizations",
+      "method": "delete",
+      "path": "/organizations/{id}",
+      "permissions": [
+        "tenant.organization.remove",
+        "organization.admin",
+        "tenant.admin"
+      ]
+    }
+  },
+  {
+    "name": "search permissionGroups",
+    "value": {
+      "collection": "permissionGroups",
+      "method": "get",
+      "path": "/permissionGroups",
+      "permissions": [
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "create permissionGroups",
+    "value": {
+      "collection": "permissionGroups",
+      "method": "post",
+      "path": "/permissionGroups",
+      "permissions": [
+        "tenant.admin"
+      ]
+    }
+  },
+  {
+    "name": "bulk create permissionGroups",
+    "value": {
+      "collection": "permissionGroups",
+      "method": "post",
+      "path": "/permissionGroups/bulk",
+      "permissions": [
+        "tenant.admin"
+      ]
+    }
+  },
+  {
+    "name": "get permissionGroups",
+    "value": {
+      "collection": "permissionGroups",
+      "method": "get",
+      "path": "/permissionGroups/{id}",
+      "permissions": [
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "update permissionGroups",
+    "value": {
+      "collection": "permissionGroups",
+      "method": "put",
+      "path": "/permissionGroups/{id}",
+      "permissions": [
+        "tenant.admin"
+      ]
+    }
+  },
+  {
+    "name": "remove permissionGroups",
+    "value": {
+      "collection": "permissionGroups",
+      "method": "delete",
+      "path": "/permissionGroups/{id}",
+      "permissions": [
+        "tenant.admin"
+      ]
+    }
+  },
+  {
+    "name": "search roleTypes",
+    "value": {
+      "collection": "roleTypes",
+      "method": "get",
+      "path": "/roleTypes",
+      "permissions": [
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "create roleTypes",
+    "value": {
+      "collection": "roleTypes",
+      "method": "post",
+      "path": "/roleTypes",
+      "permissions": [
+        "tenant.admin",
+        "organization.superadmin"
+      ]
+    }
+  },
+  {
+    "name": "bulk create roleTypes",
+    "value": {
+      "collection": "roleTypes",
+      "method": "post",
+      "path": "/roleTypes/bulk",
+      "permissions": [
+        "tenant.admin",
+        "organization.superadmin"
+      ]
+    }
+  },
+  {
+    "name": "get roleTypes",
+    "value": {
+      "collection": "roleTypes",
+      "method": "get",
+      "path": "/roleTypes/{id}",
+      "permissions": [
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "update roleTypes",
+    "value": {
+      "collection": "roleTypes",
+      "method": "put",
+      "path": "/roleTypes/{id}",
+      "permissions": [
+        "tenant.admin",
+        "organization.superadmin"
+      ]
+    }
+  },
+  {
+    "name": "remove roleTypes",
+    "value": {
+      "collection": "roleTypes",
+      "method": "delete",
+      "path": "/roleTypes/{id}",
+      "permissions": [
+        "tenant.admin",
+        "organization.superadmin"
+      ]
+    }
+  },
+  {
+    "name": "search roles",
+    "value": {
+      "collection": "roles",
+      "method": "get",
+      "path": "/roles",
+      "permissions": []
+    }
+  },
+  {
+    "name": "create roles",
+    "value": {
+      "collection": "roles",
+      "method": "post",
+      "path": "/roles",
+      "permissions": []
+    }
+  },
+  {
+    "name": "bulk create roles",
+    "value": {
+      "collection": "roles",
+      "method": "post",
+      "path": "/roles/bulk",
+      "permissions": [
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "reset the role - will log out user roles",
+    "value": {
+      "collection": "roles",
+      "method": "post",
+      "path": "/roles/{id}/reset",
+      "permissions": [
+        "tenant.admin"
+      ]
+    }
+  },
+  {
+    "name": "create dependent roles",
+    "value": {
+      "collection": "roles",
+      "method": "post",
+      "path": "/roles/{id}/dependent",
+      "permissions": [
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "create dependents roles",
+    "value": {
+      "collection": "roles",
+      "method": "post",
+      "path": "/roles/{id}/dependent/bulk",
+      "permissions": [
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "exists roles",
+    "value": {
+      "collection": "roles",
+      "method": "post",
+      "path": "/roles/isAvailable",
+      "permissions": [
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "get roles",
+    "value": {
+      "collection": "roles",
+      "method": "get",
+      "path": "/roles/{id}",
+      "permissions": []
+    }
+  },
+  {
+    "name": "update roles",
+    "value": {
+      "collection": "roles",
+      "method": "put",
+      "path": "/roles/{id}",
+      "permissions": []
+    }
+  },
+  {
+    "name": "remove roles",
+    "value": {
+      "collection": "roles",
+      "method": "delete",
+      "path": "/roles/{id}",
+      "permissions": []
+    }
+  },
+  {
+    "name": "create sessions",
+    "value": {
+      "collection": "sessions",
+      "method": "post",
+      "path": "/sessions",
+      "permissions": []
+    }
+  },
+  {
+    "name": "impersonateUser sessions",
+    "value": {
+      "collection": "sessions",
+      "method": "post",
+      "path": "/sessions/impersonateUser",
+      "permissions": [
+        "tenant.guest",
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "resend otp sessions",
+    "value": {
+      "collection": "sessions",
+      "method": "post",
+      "path": "/sessions/{id}/resend",
+      "permissions": [
+        "tenant.guest",
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "renew the token sessions",
+    "value": {
+      "collection": "sessions",
+      "method": "post",
+      "path": "/sessions/{id}/renew",
+      "permissions": [
+        "tenant.guest",
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "get sessions",
+    "value": {
+      "collection": "sessions",
+      "method": "get",
+      "path": "/sessions/{id}",
+      "permissions": [
+        "tenant.guest",
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "update sessions",
+    "value": {
+      "collection": "sessions",
+      "method": "put",
+      "path": "/sessions/{id}",
+      "permissions": [
+        "tenant.guest",
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "remove sessions",
+    "value": {
+      "collection": "sessions",
+      "method": "delete",
+      "path": "/sessions/{id}",
+      "permissions": [
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "createSSOToken sessions",
+    "value": {
+      "collection": "sessions",
+      "method": "post",
+      "path": "/sessions/createSSOToken",
+      "permissions": [
+        "tenant.guest",
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "verifySSOToken sessions",
+    "value": {
+      "collection": "sessions",
+      "method": "post",
+      "path": "/sessions/verifySSOToken",
+      "permissions": [
+        "tenant.guest"
+      ]
+    }
+  },
+  {
+    "name": "search students",
+    "value": {
+      "collection": "students",
+      "method": "get",
+      "path": "/students",
+      "permissions": [
+        "organization.user"
+      ]
+    }
+  },
+  {
+    "name": "create students",
+    "value": {
+      "collection": "students",
+      "method": "post",
+      "path": "/students",
+      "permissions": [
+        "organization.user"
+      ]
+    }
+  },
+  {
+    "name": "exists students",
+    "value": {
+      "collection": "students",
+      "method": "get",
+      "path": "/students/exists",
+      "permissions": [
+        "organization.guest",
+        "organization.user"
+      ]
+    }
+  },
+  {
+    "name": "bulk create students",
+    "value": {
+      "collection": "students",
+      "method": "post",
+      "path": "/students/bulk",
+      "permissions": [
+        "organization.admin"
+      ]
+    }
+  },
+  {
+    "name": "get students",
+    "value": {
+      "collection": "students",
+      "method": "get",
+      "path": "/students/{id}",
+      "permissions": [
+        "organization.user"
+      ]
+    }
+  },
+  {
+    "name": "update students",
+    "value": {
+      "collection": "students",
+      "method": "put",
+      "path": "/students/{id}",
+      "permissions": [
+        "organization.user"
+      ]
+    }
+  },
+  {
+    "name": "remove students",
+    "value": {
+      "collection": "students",
+      "method": "delete",
+      "path": "/students/{id}",
+      "permissions": [
+        "organization.admin"
+      ]
+    }
+  },
+  {
+    "name": "search tasks",
+    "value": {
+      "collection": "tasks",
+      "method": "get",
+      "path": "/tasks",
+      "permissions": [
+        "tenant.user",
+        "tenant.view"
+      ]
+    }
+  },
+  {
+    "name": "create tasks",
+    "value": {
+      "collection": "tasks",
+      "method": "post",
+      "path": "/tasks",
+      "permissions": [
+        "tenant.admin"
+      ]
+    }
+  },
+  {
+    "name": "get tasks",
+    "value": {
+      "collection": "tasks",
+      "method": "get",
+      "path": "/tasks/{id}",
+      "permissions": [
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "update tasks",
+    "value": {
+      "collection": "tasks",
+      "method": "put",
+      "path": "/tasks/{id}",
+      "permissions": [
+        "tenant.admin"
+      ]
+    }
+  },
+  {
+    "name": "remove tasks",
+    "value": {
+      "collection": "tasks",
+      "method": "delete",
+      "path": "/tasks/{id}",
+      "permissions": [
+        "tenant.admin"
+      ]
+    }
+  },
+  {
+    "name": "create tenants",
+    "value": {
+      "collection": "tenants",
+      "method": "post",
+      "path": "/tenants",
+      "permissions": [
+        "guest"
+      ]
+    }
+  },
+  {
+    "name": "get tenants",
+    "value": {
+      "collection": "tenants",
+      "method": "get",
+      "path": "/tenants/{id}",
+      "permissions": [
+        "guest",
+        "tenant.guest",
+        "organization.guest",
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "update tenants",
+    "value": {
+      "collection": "tenants",
+      "method": "put",
+      "path": "/tenants/{id}",
+      "permissions": [
+        "tenant.admin"
+      ]
+    }
+  },
+  {
+    "name": "remove tenants",
+    "value": {
+      "collection": "tenants",
+      "method": "delete",
+      "path": "/tenants/{id}",
+      "permissions": [
+        "tenant.admin"
+      ]
+    }
+  },
+  {
+    "name": "exists tenants",
+    "value": {
+      "collection": "tenants",
+      "method": "get",
+      "path": "/tenants/{code}/exists",
+      "permissions": [
+        "guest"
+      ]
+    }
+  },
+  {
+    "name": "search users",
+    "value": {
+      "collection": "users",
+      "method": "get",
+      "path": "/users",
+      "permissions": []
+    }
+  },
+  {
+    "name": "create users",
+    "value": {
+      "collection": "users",
+      "method": "post",
+      "path": "/users",
+      "permissions": [
+        "tenant.guest",
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "exists users",
+    "value": {
+      "collection": "users",
+      "method": "get",
+      "path": "/users/exists",
+      "permissions": [
+        "tenant.guest",
+        "organization-guest",
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": " users",
+    "value": {
+      "collection": "users",
+      "method": "post",
+      "path": "/users/register",
+      "permissions": [
+        "tenant.guest",
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "login users",
+    "value": {
+      "collection": "users",
+      "method": "post",
+      "path": "/users/signIn",
+      "permissions": [
+        "tenant.guest",
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": " users",
+    "value": {
+      "collection": "users",
+      "method": "post",
+      "path": "/users/signOut/{id}",
+      "permissions": [
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "register users",
+    "value": {
+      "collection": "users",
+      "method": "post",
+      "path": "/users/signUp",
+      "permissions": [
+        "tenant.guest",
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "confirm otp users",
+    "value": {
+      "collection": "users",
+      "method": "post",
+      "path": "/users/confirm",
+      "permissions": [
+        "tenant.guest",
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "set password self users",
+    "value": {
+      "collection": "users",
+      "method": "post",
+      "path": "/users/setPassword",
+      "permissions": [
+        "tenant.guest",
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "set password for id users",
+    "value": {
+      "collection": "users",
+      "method": "post",
+      "path": "/users/setPassword/{id}",
+      "permissions": [
+        "tenant.guest",
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "request password reset users",
+    "value": {
+      "collection": "users",
+      "method": "post",
+      "path": "/users/resetPassword",
+      "permissions": [
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "change password users",
+    "value": {
+      "collection": "users",
+      "method": "post",
+      "path": "/users/changePassword",
+      "permissions": [
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "resend otp users",
+    "value": {
+      "collection": "users",
+      "method": "post",
+      "path": "/users/resend",
+      "permissions": [
+        "tenant.guest",
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "get users",
+    "value": {
+      "collection": "users",
+      "method": "get",
+      "path": "/users/{id}",
+      "permissions": []
+    }
+  },
+  {
+    "name": "update users",
+    "value": {
+      "collection": "users",
+      "method": "put",
+      "path": "/users/{id}",
+      "permissions": []
+    }
+  },
+  {
+    "name": "update profile users",
+    "value": {
+      "collection": "users",
+      "method": "put",
+      "path": "/users/{id}/profile",
+      "permissions": [
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "start external auth users",
+    "value": {
+      "collection": "users",
+      "method": "get",
+      "path": "/users/auth/{provider}",
+      "permissions": [
+        "tenant.guest",
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "on external auth success users",
+    "value": {
+      "collection": "users",
+      "method": "get",
+      "path": "/users/auth/{provider}/success",
+      "permissions": [
+        "tenant.guest",
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "on external auth success users",
+    "value": {
+      "collection": "users",
+      "method": "post",
+      "path": "/users/auth/{provider}/success",
+      "permissions": [
+        "tenant.guest",
+        "tenant.user"
+      ]
+    }
+  },
+  {
+    "name": "on external auth logout users",
+    "value": {
+      "collection": "users",
+      "method": "get",
+      "path": "/users/auth/{provider}/logout",
+      "permissions": [
+        "tenant.guest",
+        "tenant.user"
+      ]
+    }
+  }
+]
