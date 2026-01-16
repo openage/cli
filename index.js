@@ -1,22 +1,30 @@
 #!/usr/bin/env node
-process.env.NODE_NO_WARNINGS = 1
-const path = require('path')
-process.env.NODE_CONFIG_DIR = path.join(__dirname, './config')
+process.env.NODE_NO_WARNINGS = '1'
+process.env.OA_CWD = process.env.OA_CWD || process.cwd()
 
-require('./initialize/handlers')
-require('./initialize/transformers')
-require('./initialize/providers')
+const getArg = (name) => {
+    const prefix = `--${name}=`
+    const arg = process.argv.find(a => a.startsWith(prefix))
+    return arg ? arg.replace(prefix, '') : null
+}
+const env = getArg('env')
+if (env && !process.env.NODE_ENV) {
+    process.env.NODE_ENV = env
+}
 
-const command = require('./services/command');
-const constant = require('./services/constant');
-const context = require('./services/context');
-const application = require('./services/application');
-const alert = require('./services/alert');
-const auth = require('./services/auth');
-const input = require('./helpers/input');
-const logger = require('./helpers/logger');
+import * as command from './src/services/command.js'
+import * as constant from './lib/constants/index.js'
+import { settings } from './lib/helpers/data.js'
+import * as context from './lib/services/context.js'
+import application from './lib/services/application.js'
+import * as notifications from './lib/helpers/notifications.js'
+import * as auth from './lib/services/auth.js'
+import * as input from './lib/helpers/input.js'
+import logger from './lib/helpers/logger.js'
 
-logger.level('fatal');
+settings.getOrSet('logger.level', 'fatal')
+let log = logger('root')
+process.env.NODE_ENV = process.env.NODE_ENV || context.env()
 
 /**
  * Main application loop that handles command execution
@@ -26,53 +34,50 @@ logger.level('fatal');
 const _run = async () => {
     let cmd
     // If in interactive mode, prompt user for command
-    if (context.interactive()) {
-        cmd = await input.get('cmd');
+    if (settings.get('interactive')) {
+        cmd = await input.get('cmd')
     } else {
         // Otherwise use default 'run' action
         cmd = constant.actions.get('run')
     }
     // Execute the command and continue the loop
-    await runCmd(cmd)
-    await _run();
-}
-
-const runCmd = async (cmd, params) => {
-    logger.debug('Running', cmd.title)
     try {
-        let result = await require(`./handlers/${cmd.handler}`).process(params || {})
-        alert.success(cmd.title, result || 'Done')
+        await command.execute(cmd)
     } catch (e) {
-        context.interactive(true)
-        logger.error(e)
-        alert.error(cmd.title, 'Something went wrong')
+        settings.set('interactive', true)
+        log.error(e)
     }
+    await _run()
 }
 
 const init = async () => {
-    logger.debug('Booting', 'Getting Config')
-    process.env.OA_CWD = await input.get('cwd', {})
-    await application.init();
-    logger.debug('Booting', 'Logging in')
-    await auth.init();
+    log.debug('Getting Config')
+    await application.init()
+    if (settings.get('interactive')) {
+        context.show()
+    }
+
+    log.debug('Logging in')
+    await auth.init()
     let cmd = command.get()
     if (cmd) {
-        let action = constant.actions.get(cmd);
+        let action = constant.actions.get(cmd)
         if (action) {
-            logger.debug('Running', action.code)
+            log.debug('Running', action.code)
             try {
-                await command.run();
+                await command.run()
             } catch (e) {
-                logger.error(e)
-                alert.error(`CMD_RUN_${e.message}`, { action: action.code, error: e })
+                log.error(e)
+                // notifications.error('CMD_RUN_UNKNOWN_ERROR')
+                // console.log(log.logFile())
             }
         } else {
-            await runCmd(constant.actions.get('script'), cmd)
+            await command.execute(constant.actions.get('script'), { _: ['script', cmd] })
         }
     } else {
-        context.interactive(false)
-        await _run();
+        settings.set('interactive', true)
+        await _run()
     }
 }
 
-init();
+init()

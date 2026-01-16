@@ -9,7 +9,7 @@
 /config/*
 !/config/default.json
 build.log
-/dist
+/build
 /.cache
 /.logs
 /.vscode/launch.json

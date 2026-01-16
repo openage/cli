@@ -1,211 +1,253 @@
 # OA Command Line Interface
 
-A CLI tool for managing workspace resources with commands for pulling, pushing, and managing sessions.
+A command-line tool for managing workspace resources with support for pulling, pushing, testing, and scripting operations against remote services.
 
-## Quick Start
+## Installation
 
-### First-time setup
+### Packaged Binary (Recommended)
+If a packaged binary is available for your platform:
+- **Windows**: Download `oa.exe` and place it in a folder included in your `PATH` (e.g., `C:\Windows\System32` or a custom folder).
+- **Unix/Linux/macOS**: Download the `oa` binary, place it in `/usr/local/bin`, and make it executable with `chmod +x oa`.
 
+### Via Node.js (Development)
+If you have Node.js installed:
 ```bash
-oa --host console.domain.com --env prod
-```
-It would prompt you to login
-
-### Common operations
-
-```bash
-# Pull specific resource
-oa pull get://system/navs/home   
-# Push changes 
-oa push system/navs/home.json 
-# Run a script (in .scripts folder)
-oa builk            
+# Clone or download the project
+npm install
+node index.js --help
 ```
 
-## Workspace Structure
+## Getting Started
 
-The workspace contains:
-- `.cache` - Temporary files
+### First-Time Setup
+1. Set your host and environment:
+   ```bash
+   oa --host console.domain.com --env prod
+   ```
+   These can also be passed as global options with any command.
+
+2. The CLI will prompt for authentication when needed. Session tokens are cached securely in `.oa/cache`.
+
+### Workspace Structure
+The CLI uses the following folder structure in your workspace:
+- `.cache` - Encrypted session cache
+- `.oa/settings.json` - CLI configuration (with environment-specific overrides like `.oa/settings.dev.json`)
+- `.oa/meta` - Per-folder remote metadata for mapping local to remote resources
 - `.logs` - Operation logs
-- `.settings` - Configuration
-- `.scripts` - Custom scripts
+- `data` - Data folders (e.g., `data/system/navs`)
+- `specs` - Test specification files
+- `scripts` - Custom operation scripts
 
-## Core Commands
+To sync a folder with a remote service, add a `.oa/remote.json` file describing the remote source.
 
-### pull
+## Commands Overview
 
-Here are the supported variations:
+- `oa pull <source?> <target?>` - Fetch data from remote to local
+- `oa push <source?> <target?>` - Send local data to remote
+- `oa test <spec-or-folder>` - Run JSON-based test specifications
+- `oa config [key] [value]` - View or manage configuration
+- `oa data <store/key?> [value?]` - Manage data stores for test inputs/outputs
+- `oa script <path>` - Execute custom scripts
+- `oa login` / `oa logout` - Manage authentication
+
+Use `--help` with any command for detailed options:
+```bash
+oa pull --help
+```
+
+## Configuration
+
+Manage CLI settings stored in `.oa/settings.json`.
 
 ```bash
-# by target folder
-oa pull system/navs/docs   
-# explicit target folder                  
-oa pull folder://system/navs/docs   
-# by target file        
-oa pull system/navs/docs/home.json  
-# explicit target file        
-oa pull file://system/navs/docs/home.json  
-# by source
-oa pull get://system/navs/home?application-code=docs     
-oa pull search://system/navs?application-code=docs       
-# by source and target
+# View all settings
+oa config
+
+# View a specific setting
+oa config logger.level
+
+# Set a value
+oa config logger.level debug
+
+# Set and encrypt a sensitive value
+oa config credentials.password mysecret --encrypt
+```
+
+Settings support dot-notation for nested properties and environment-specific overrides.
+
+## Data Management
+
+Store and retrieve small data values for workflows, useful for test inputs and temporary data.
+
+```bash
+# View all data in a store
+oa data input
+
+# View a specific key
+oa data input:user.email
+
+# Set a value
+oa data input:user.email admin@example.com
+
+# Set and encrypt a sensitive value
+oa data input:credentials.password mysecret --encrypt
+```
+
+Data is stored in `.data/<store>/<env>.json` (e.g., `.data/input/default.json`) with environment-specific overrides.
+
+## Pulling Data
+
+Fetch data from remote services to local files.
+
+### Single Item
+```bash
+# Using metadata in the same folder
+oa pull system/navs/home.json
+
+# Explicit source
 oa pull get://system/navs/home?application-code=docs system/navs/docs/home.json
-oa pull search://system/navs?application-code=docs system/navs/docs
 ```
 
-- If only one parameter is provided can be **source** or **target**.
-- If the **source** is not specified, it is fetched from the meta in `.oa` folder.
-- If the **target** is not specified, it is inferred from the source.
-- In case both of them are provided, first one needs to be **source** and the second one needs to be **target**
-
-#### all items
-It can be used pull all the items from remote to the local folder. Lets assume there is a folder `docs-nav` where you want to pull all the navs for the applicaiton `docs` from api `navs` in service `system`. It needs to have folder `.oa` where there should be the meta file `remote.json`. Here is the sample meta file
-
-```json
-{
-  "service": "system",
-  "collection": "navs",
-  "query": {
-    "application-code": "docs"
-  }
-}
-```
-To do this you need run following command
+### Bulk/Folder Pull
 ```bash
+# Using .oa/remote.json in the folder
 oa pull docs-nav
+
+# Explicit source
+oa pull search://system/navs?application-code=docs docs-nav
 ```
-Here is how it works
-1. gets the remote source config from the meta file `docs-nav/.oa/remote.json`. 
-2. fetches the list of items from the source
-3. for each item creates/updates
-   - the data file `docs-nav/{{id}}.json` 
-   - the meta file `docs-nav/.oa/{{id}}.json`
 
-#### single item
-For a single item, you need to specify the file path (e.g. `system/navs/home.json`) where you need to save the data. It also needs the remote source from meta file by same name in folder `.oa`. Here is the sample meta file
+Supported URI schemes:
+- `get://service/collection/id?params` - Single item
+- `search://service/collection?params` - List of items
+- `folder://path/to/folder` - Local folder
+- `file://path/to/file.json` - Local file
 
+For bulk pulls, create a `.oa/meta/system/navs/remote.json`:
 ```json
 {
   "service": "system",
   "collection": "navs",
-  "id": "home"
+  "query": { "application-code": "docs" }
 }
 ```
-To do this you need run following command
+
+## Pushing Data
+
+Send local data to remote services.
+
+### Single File
 ```bash
-oa pull system/navs/home.json 
-```
-Here is how it works
-1. gets the remote source config from the meta file `system/navs/.oa/home.json`. 
-2. fetches the data from the source
-3. updates 
-   - the data file `system/navs/home.json`
-   - the meta file `system/rorolesTypesles/.oa/home.json`
+# Using metadata
+oa push system/navs/home.json
 
-### push
-
-Here are the supported variations:
-
-```bash
-oa push system/navs/docs/home.json
-oa push file:system/navs/docs/home.json
-oa push system/navs/docs
-oa push folder://system/navs/docs
-oa push system/navs/docs/home.json update://system/navs/home?application-code=docs
-oa push system/navs/docs create://system/navs?application-code=docs
-```
-- The first parmeter is **source**
-- The second paramter is the **target** and is optional. If is not specified, it is fetched from `.oa/remote.json`.
-
-
-The push works exactly like pull
-
-#### single item
-Run following command to push a file to remote
-```bash
-oa push system/navs/home.json 
-# or
-oa push file://system/navs/home.json 
+# Explicit target
+oa push system/navs/home.json update://system/navs/home?application-code=docs
 ```
 
-Here is how it works
-1. gets the remote target config from the meta file `system/navs/.oa/home.json`. 
-2. gets the data from the file `system/navs/.oa/home.json`. 
-3. updates the remote target
-
-#### all items
-Run following command to push a all the files in a folder to remote
-
+### Bulk Push
 ```bash
-oa push system/navs 
+oa push system/navs
 ```
 
-### script
-Executes operation scripts:
-```bash
-oa script .scripts/bulk.json
-```
+Use `create://` for new items, `update://` for existing ones.
 
-This is shorthand and assumes a file `bulk.json` exists in `.scripts` folder
+## Testing
+
+Run JSON-based test specifications with request/response validation.
 
 ```bash
-oa bulk
+# Single spec
+oa test specs/directory/sessions/create.json
+
+# All specs in folder
+oa test specs/directory
 ```
 
+Options:
+- `--show-response` - Display raw request/response
+- `--export-curl` - Show equivalent cURL command
 
-Script format example:
-```JSON
+Example spec:
+```json
 {
-    "items": [{
-        "type": "pull",
-        "config": {
-            "remote": "search://system/applications"
-        }
-    }]
+  "name": "Create Session",
+  "request": {
+    "method": "POST",
+    "url": "{{context.tenant.services.directory.url}}/sessions",
+    "headers": { "Content-Type": "application/json" },
+    "body": {
+      "user": { "email": "{{input.email}}" },
+      "credentials": { "password": "{{input.password}}" }
+    }
+  },
+  "validations": [
+    { "field": "status", "value": 200 },
+    { "field": "duration", "operator": "<", "value": 1000 }
+  ]
 }
 ```
 
-## Common Workflows
+## Scripting
 
-### Configuration Management
+Execute sequences of operations defined in JSON scripts.
 
-- Pull config
 ```bash
-oa pull get://system/navs/home
-```
-- Edit locally
-- Push changes
-```bash
-oa push system/navs/home.json
+oa script scripts/bulk.json
 ```
 
-### Environment Promotion
+Example script:
+```json
+{
+  "items": [
+    { "type": "pull", "config": { "remote": "search://system/applications" } },
+    { "type": "push", "config": { "source": "data/system/navs" } }
+  ]
+}
+```
+
+## Troubleshooting
+
+- **Debug logging**: Add `--log-level debug` to commands
+- **Check logs**: Review `.logs/` for detailed request/response records
+- **Authentication issues**: Re-run the command to re-authenticate, or clear `.oa/cache`
+- **URI confusion**: Use `file://` or `folder://` for local paths, `get://` or `search://` for remote
+- **Configuration**: Edit `.oa/settings.json` directly or use `oa config`
+
+## Examples
+
 ```bash
-# Dev environment
+# Set environment
 oa --host console.domain.com --env dev
-oa pull get://system/navs/home
 
-# Prod environment
-oa --host console.domain.com --env prod
+# Pull data
+oa pull system/navs/home.json
+
+# Push changes
 oa push system/navs/home.json
+
+# Run tests
+oa test specs/directory --show-response
+
+# Configure settings
+oa config logger.level debug
+
+# Manage data
+oa data test/input:user.email admin@example.com
+
+# Run a script
+oa script scripts/bulk.json
 ```
 
-## Build Instructions
+## Build (For Developers)
 
-Prerequisites: Node.js 16+, pkg package
+Prerequisites: Node.js 16+, `pkg`, `resedit`
 
 ```bash
-# Install pkg
-npm install -g pkg
-
-# Build for specific platform
-node build.js --platform win --architecture x64
-
-# Build for all platforms
-node build.js --platform all
+npm install -g pkg resedit
+node scripts/build-win.mjs --platform win --architecture x64  # Windows
+node scripts/build-win.mjs --platform all                     # All platforms
 ```
 
-Build outputs:
-- Windows: `../../builds/oa.exe`
-- Unix: `/usr/local/bin/oa`
+Outputs to `../../builds/`.
 
