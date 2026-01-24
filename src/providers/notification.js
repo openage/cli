@@ -146,7 +146,7 @@ const tabular = (title, data, styles) => {
     data.rows.forEach(r => {
         const row = []
         for (let index = 0; index < r.length; index++) {
-            const value = r[index];
+            const value = r[index]
             const conditions = styles.conditions[`${index}`]
 
             if (conditions) {
@@ -158,7 +158,7 @@ const tabular = (title, data, styles) => {
         }
 
         table.push(row)
-    });
+    })
     console.log(table.toString())
 }
 

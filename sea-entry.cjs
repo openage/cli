@@ -13,7 +13,7 @@ if (env && !process.env.NODE_ENV) {
 }
 
 // Import the ES module
-import('file:///D:/code/oa/tools/cli-app-v2/index.js').catch(err => {
+import('file:///D:/code/oa/tools/cli/index.js').catch(err => {
     console.error('Failed to load application:', err)
     console.error('Current working directory:', process.cwd())
     console.error('Script path:', __filename)

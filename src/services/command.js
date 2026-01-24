@@ -4,8 +4,11 @@ import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
 import * as constant from '../../lib/constants/index.js'
 import * as input from '../../lib/helpers/input.js'
+import logger from '../../lib/helpers/logger.js'
 
 export const execute = async (item, options) => {
+    let log = logger('services.command.execute')
+    log.silly('handler', item.handler)
     const handler = await import(`../../lib/handlers/${item.handler}.js`)
 
     if (!handler) {
@@ -17,7 +20,7 @@ export const execute = async (item, options) => {
 
     for (const key in options) {
         if (!Object.hasOwn(options, key) || key === '$0'
-        ) continue;
+        ) continue
 
         const args = options[key]
 
@@ -31,6 +34,7 @@ export const execute = async (item, options) => {
                     params = handler.parse(args)
                 } else {
                     for (const a of args) {
+                        log.silly('arg', a)
                         const p = input.parse(a)
 
                         if (typeof p === 'string') {
@@ -51,7 +55,6 @@ export const execute = async (item, options) => {
                 }
             }
         } else {
-
             params[key] = Array.isArray(options[key]) ? options[key].map(p => input.parse(p)) : input.parse(options[key])
         }
     }
