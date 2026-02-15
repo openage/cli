@@ -177,7 +177,7 @@ Example spec:
     "url": "{{context.tenant.services.directory.url}}/sessions",
     "headers": { "Content-Type": "application/json" },
     "body": {
-      "user": { "email": "{{input.email}}" },
+      "user": { "email": "{{prompt.email}}" },
       "credentials": { "password": "{{input.password}}" }
     }
   },
@@ -187,6 +187,10 @@ Example spec:
   ]
 }
 ```
+
+The prompt supports two formats:
+1. Full Format: `[type] key=defaultValue: Message`; example - `{{prompt.[text] firestName: First Name}}`
+2. Shorthand: `email`, `password` (maps to predefined constants); ; example - `{{prompt.password}}`
 
 ## Scripting
 
@@ -222,6 +226,7 @@ oa --host console.domain.com --env dev
 
 # Pull data
 oa pull system/navs/home.json
+oa pull ./data/system/navs https://system/navs --transforms remove:obj://id,timeStamp
 
 # Push changes
 oa push system/navs/home.json

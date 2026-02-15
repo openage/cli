@@ -85,6 +85,13 @@ export const select = async (message, choices) => {
     })
 }
 
+export const confirm = async (message, choices) => {
+
+    return inquirer.confirm({
+        message: message || 'Are you sure?',
+    })
+}
+
 export const navigate = async (message, url) => {
     const proceed = await inquirer.confirm({
         message: message || 'This will launch url in browser',
