@@ -152,6 +152,36 @@ oa push system/navs
 
 Use `create://` for new items, `update://` for existing ones.
 
+## Remote Metadata
+
+Manage remote metadata mappings for local files, enabling push/pull operations to track which files correspond to which remote resources.
+
+### Create or Update Remote Metadata
+```bash
+# Map a local file to a remote resource
+oa remote ./data/system/navs/home.json https://system/navs/home?application=www-applegos
+
+# Or get the mapped remote for the local file
+oa remote ./data/system/navs/home.json
+```
+
+This command shows the mapped remote
+
+```yaml
+remote.type: "http"
+remote.config.service: "system"
+remote.config.collection: "navs"
+remote.config.query.application: "www-applegos"
+remote.config.id: "home"
+```
+
+The remote command stores metadata in `.oa/meta/`, creating a mapping that includes:
+- Local file information (path, id, code)
+- Remote resource information (service, collection, query parameters)
+- Resource metadata (name, summary, timestamp)
+
+This metadata is used by push and pull operations to maintain the relationship between local files and their remote counterparts, enabling smart sync operations.
+
 ## Testing
 
 Run JSON-based test specifications with request/response validation.
