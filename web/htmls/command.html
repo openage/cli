@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OA CLI Command Detail</title>
+    <link rel="stylesheet" href="../styles.css" />
+</head>
+
+<body>
+    <div class="app">
+        <div class="sidebar">
+            <div class="brand"><img src="https://raw.githubusercontent.com/openage/openage.github.io/master/logo.png"
+                    alt="logo" />
+                <div><strong>OA CLI</strong><br /><small>Command docs</small></div>
+            </div>
+            <div id="command-list"></div>
+        </div>
+        <main class="main">
+            <div id="main-content"></div>
+        </main>
+    </div>
+    <script type="module">
+        import { commands } from '../command-data.js'
+        const params = new URLSearchParams(window.location.search)
+        const cmdName = params.get('cmd')
+        const command = commands.find(c => c.name === cmdName) || commands[0]
+
+        const content = document.getElementById('main-content')
+        const list = document.getElementById('command-list')
+
+        commands.forEach(c => {
+            const a = document.createElement('a')
+            a.href = `command.html?cmd=${c.name}`
+            a.textContent = c.title
+            if (c.name === command.name) a.style.fontWeight = 'bold'
+            list.appendChild(a)
+        })
+
+        content.innerHTML = `
+      <div class="card">
+        <h1>${command.title}</h1>
+        <p class="summary">${command.overview}</p>
+        <p><strong>Concepts</strong></p>
+        <ul>${command.keyConcepts.map(k => `<li>${k}</li>`).join('')}</ul>
+        <p><strong>Options</strong></p>
+        <ul>${command.options.map(o => `<li>${o}</li>`).join('')}</ul>
+        <p><strong>Examples</strong></p>
+        <ul>${command.examples.map(e => `<li><code>${e}</code></li>`).join('')}</ul>
+      </div>
+    `
+    </script>
+</body>
+
+</html>

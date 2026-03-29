@@ -1,0 +1,28 @@
+<section class="card">
+    <h3>Update</h3>
+    <form id="config-form" class="config-form">
+        <input id="config-key-input" class="terminal-input" type="text" placeholder="key (e.g. logger.level)"
+            required />
+        <input id="config-value-input" class="terminal-input" type="text" placeholder="value (e.g. info, true, 3000)" />
+        <label class="config-encrypt"><input id="config-encrypt-input" type="checkbox" /> Encrypt</label>
+        <button class="terminal-run" type="submit">Save</button>
+    </form>
+    <p id="config-feedback" class="summary"></p>
+</section>
+<section class="card">
+    <h3>Current Values</h3>
+    <div class="config-table-wrap">
+        <table class="config-table">
+            <thead>
+                <tr>
+                    <th>Key</th>
+                    <th>Value</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{CONFIG_ROWS}}
+            </tbody>
+        </table>
+    </div>
+</section>

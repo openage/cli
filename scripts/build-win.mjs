@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process'
-import { copyFileSync, mkdirSync, existsSync, readFileSync, statSync } from 'node:fs'
+import { copyFileSync, mkdirSync, existsSync, readFileSync, statSync, cpSync, rmSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -40,10 +40,18 @@ if (!existsSync(distFolder)) {
     mkdirSync(distFolder, { recursive: true })
 }
 
-// Create versioned executable name
-const distExeName = `oa.exe`
+// Create executable in dist folder
+const distExeName = 'oa.exe'
 const destExe = join(distFolder, distExeName)
 copyFileSync(exe, destExe)
+
+// Copy web assets required by serve command
+const webSource = join(root, 'web')
+const webDest = join(distFolder, 'web')
+if (existsSync(webDest)) {
+    rmSync(webDest, { recursive: true, force: true })
+}
+cpSync(webSource, webDest, { recursive: true })
 
 // Create zip file for distribution
 const zipName = `oa-cli-v${version}-windows.zip`
@@ -56,15 +64,16 @@ copyFileSync(readmeSrc, readmeDest)
 
 try {
     execSync(
-        `powershell "Compress-Archive -Path '${destExe}', '${readmeDest}' -DestinationPath '${zipPath}' -Force"`,
+        `powershell "Compress-Archive -Path '${destExe}', '${readmeDest}', '${webDest}' -DestinationPath '${zipPath}' -Force"`,
         { stdio: 'inherit' }
     )
-    console.log('\n✔ Distribution package created:', zipPath)
+    console.log('\nDistribution package created:', zipPath)
 } catch (error) {
-    console.log('\n⚠️  Could not create zip file, but exe is ready:', destExe)
+    console.log('\nCould not create zip file, but exe is ready:', destExe)
 }
 
-console.log('\n✔ Windows SEA build complete!')
-console.log(`📦 Distribution file: ${destExe}`)
-console.log(`📦 Zip archive: ${zipPath}`)
-console.log(`📏 File size: ${Math.round(statSync(destExe).size / 1024 / 1024)}MB`)
+console.log('\nWindows SEA build complete!')
+console.log(`Distribution file: ${destExe}`)
+console.log(`Web assets: ${webDest}`)
+console.log(`Zip archive: ${zipPath}`)
+console.log(`File size: ${Math.round(statSync(destExe).size / 1024 / 1024)}MB`)

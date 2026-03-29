@@ -4,6 +4,7 @@ import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
 import * as constant from '../../lib/constants/index.js'
 import * as input from '../../lib/helpers/input.js'
+import * as file from '../../lib/helpers/file.js'
 import logger from '../../lib/helpers/logger.js'
 
 export const execute = async (item, options) => {
@@ -55,7 +56,25 @@ export const execute = async (item, options) => {
                 }
             }
         } else {
-            params[key] = Array.isArray(options[key]) ? options[key].map(p => input.parse(p)) : input.parse(options[key])
+            let value = options[key]
+            value = Array.isArray(options[key]) ? options[key].map(p => input.parse(p)) : input.parse(options[key])
+            params[key] = value
+            if (key === 'local') {
+
+                params.files = file.find(value.resource, {
+                    exclude: {
+                        folders: [
+                            '.oa',
+                            '.logs',
+                            '.cache',
+                            'scripts'
+                        ]
+                    },
+                    include: {
+                        files: ['.json']
+                    }
+                })
+            }
         }
     }
     await handler.execute(params)
