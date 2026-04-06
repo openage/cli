@@ -9,6 +9,16 @@
 </head>
 
 <body>
+    <div id="app-progress" class="app-progress hidden">
+        <div class="progress-header">
+            <span id="progress-title">Processing...</span>
+            <span id="progress-percent">0%</span>
+        </div>
+        <div class="progress-bar">
+            <div id="progress-fill" class="progress-fill"></div>
+        </div>
+        <div id="progress-details" class="progress-details">Starting operation...</div>
+    </div>
     <div class="app has-terminal">
         <aside class="sidebar left-sidebar">
             <div class="brand"><img src="https://raw.githubusercontent.com/openage/openage.github.io/master/logo.png"

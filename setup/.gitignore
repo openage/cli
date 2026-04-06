@@ -1,0 +1,6 @@
+.logs
+.oa
+.test/**
+.cache/**
+.data/**
+.bak/**

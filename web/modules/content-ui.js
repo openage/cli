@@ -3,6 +3,30 @@ import { copyText, buildAbsoluteUrl, getFileIcon, escapeHtml } from './utils.js'
 
 export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUseCommand, onAddLocalPath }) => {
     const sectionTemplateCache = new Map()
+    let settingsMeta = null
+
+    const loadSettingsMeta = async () => {
+        if (settingsMeta) return settingsMeta
+        settingsMeta = {}
+        try {
+            const res = await fetch('/api/config-metadata')
+            if (res.ok) {
+                const body = await res.json()
+                const list = body.data || []
+                list.forEach((item) => {
+                    if (!item.code) return
+                    settingsMeta[item.code] = {
+                        label: item.message || item.code,
+                        type: item.type === 'list' ? 'options' : (item.type === 'confirm' ? 'boolean' : item.type),
+                        options: (item.choices || []).map((c) => (typeof c === 'object' ? c : { name: c, value: c }))
+                    }
+                })
+            }
+        } catch {
+            // ignore
+        }
+        return settingsMeta
+    }
 
     const loadSectionTemplate = async (sectionName) => {
         if (sectionTemplateCache.has(sectionName)) {
@@ -175,7 +199,18 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
             const isFile = entry.type === 'file'
             const schemaOptions = [...(metaPayload?.schemaOptions || []), ...(metaPayload?.schemaType ? [{ value: metaPayload.schemaType, label: metaPayload.schemaType }] : [])]
                 .filter((item, index, arr) => item?.value && arr.findIndex((other) => other?.value === item.value) === index)
-            return `
+        const isNavFile = entry.type === 'file' && (entry.path || '').includes('system/navs')
+        const navUrl = metaPayload?.meta?.url || ''
+        const context = window['oaContext'] || {}
+        const webHost = context.web || ''
+        const sessionToken = context.session?.token || ''
+        const webBase = webHost.replace(/\/+$/, '')
+        const navPath = navUrl.replace(/^\/+/, '')
+        const pageUrl = (isNavFile && navUrl && webHost)
+            ? `${webBase.startsWith('http') ? webBase : `https://${webBase}`}/${navPath}?session-token=${sessionToken}`
+            : ''
+
+        return `
               <section class="card meta-card" id="details-card">
                 <section class="details-header">
                   <span class="file-icon">${isFile ? escapeHtml(getFileIcon(entry.name)) : 'DIR'}</span>
@@ -223,6 +258,7 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                     ${isFile ? `<button type="button" class="copy-btn" data-run-command="${escapeHtml(`oa test${entry.cwdRelativePath ? ` --local ./${entry.cwdRelativePath}` : ''}`)}">Validate Schema</button>` : ''}
                     ${isFile ? `<button type="button" class="copy-btn" data-open-vscode="${escapeHtml(entry.path)}">Open In Editor</button>` : `<button type="button" class="copy-btn" data-open-path="${escapeHtml(entry.path)}">Open Folder</button>`}
                     <button type="button" class="copy-btn" data-copy-webpath="${escapeHtml(entry.webPath || '')}">Copy Web URL</button>
+                    ${pageUrl ? `<a href="${escapeHtml(pageUrl)}" target="_blank" class="copy-btn">View Page</a>` : ''}
                   </div>
                   <p class="summary" data-meta-feedback></p>
                 </section>
@@ -445,18 +481,71 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
     }
 
     const renderConfig = async (configPayload, onRefresh, onSave) => {
-        const rows = flattenConfig(configPayload?.data || {})
+        const flattened = flattenConfig(configPayload?.data || {})
             .sort((a, b) => a.key.localeCompare(b.key))
-            .map((item) => {
+
+        const configDescriptions = {
+            logger: 'Control logging verbosity and module-specific debug details. Values: fatal, error, warn, info, debug, trace, silly.',
+            application: 'Core configuration for host, theme, and application-specific settings.',
+            services: 'Service endpoint definitions and resource-specific remote configurations.',
+            auth: 'Management of sessions, user identity, and authentication tokens.',
+            ux: 'User experience settings including interactive mode and display mode (cli/web).',
+            navs: 'Custom navigation overrides and UI layout configuration extensions.',
+            git: 'Optional repository settings for git-integrated flows.'
+        }
+
+        const groups = flattened.reduce((acc, item) => {
+            const root = item.key.split('.')[0] || '(root)'
+            if (!acc[root]) acc[root] = []
+            acc[root].push(item)
+            return acc
+        }, {})
+
+        const metaMap = await loadSettingsMeta()
+
+        const groupCards = Object.entries(groups).map(([root, items]) => {
+            const description = configDescriptions[root.toLowerCase()] || ''
+            const rows = items.map((item) => {
                 const valueString = toConfigValueString(item.value)
+                const meta = metaMap[item.key] || {}
+                const type = meta.type || 'string'
+                const displayName = meta.label || item.key
+                
+                let displayValue = valueString
+                if (type === 'options' && meta.options) {
+                    const choice = meta.options.find((c) => String(c.value) === String(item.value))
+                    if (choice) {
+                        displayValue = choice.name
+                    }
+                }
+
+                let valDisplayHtml = `<code>${escapeHtml(displayValue)}</code>`
+                if (type === 'boolean') {
+                    const normalizedValue = String(item.value).toLowerCase()
+                    const checked = (normalizedValue === 'true' || normalizedValue === '1' || item.value === true)
+                    valDisplayHtml = `<input type="checkbox" class="config-checkbox" ${checked ? 'checked' : ''} disabled />`
+                }
+
                 return `
-                  <tr>
-                    <td><code>${escapeHtml(item.key)}</code></td>
-                    <td><code>${escapeHtml(valueString)}</code></td>
-                    <td><button type="button" class="copy-btn" data-config-fill-key="${escapeHtml(item.key)}" data-config-fill-value="${escapeHtml(valueString)}">Edit</button></td>
-                  </tr>
+                  <div class="config-pair">
+                    <div class="config-key" title="${escapeHtml(item.key)}">${escapeHtml(displayName)}:</div>
+                    <div class="config-value" data-config-fill-key="${escapeHtml(item.key)}" data-config-fill-value="${escapeHtml(valueString)}">
+                       ${valDisplayHtml}
+                    </div>
+                  </div>
                 `
             }).join('')
+
+            return `
+              <section class="card config-group-card">
+                <h3>${escapeHtml(root.toUpperCase())}</h3>
+                ${description ? `<p class="summary">${escapeHtml(description)}</p>` : ''}
+                <div class="config-list">
+                  ${rows}
+                </div>
+              </section>
+            `
+        }).join('')
 
         const outputText = [configPayload?.output || '', configPayload?.error || '']
             .filter(Boolean)
@@ -464,67 +553,265 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
 
         mainContent.innerHTML = await renderSectionTemplate('config', {
             CONFIG_OUTPUT: escapeHtml(outputText || '(No output)'),
-            CONFIG_ROWS: rows || '<tr><td colspan="3">No config values found.</td></tr>'
+            CONFIG_GROUPS: groupCards || '<section class="card"><p class="summary">No config values found.</p></section>'
         })
 
-        const configForm = mainContent.querySelector('#config-form')
-        const keyInput = mainContent.querySelector('#config-key-input')
-        const valueInput = mainContent.querySelector('#config-value-input')
-        const encryptInput = mainContent.querySelector('#config-encrypt-input')
-        const feedback = mainContent.querySelector('#config-feedback')
+        const addBtn = mainContent.querySelector('#config-add-btn')
+        addBtn?.addEventListener('click', async () => {
+            const key = prompt('Enter configuration key (e.g., application.host):')
+            if (!key) return
+            const value = prompt(`Enter value for ${key}:`)
+            if (value === null) return
+            try {
+                await onSave(key, value)
+                const next = await onRefresh()
+                await renderConfig(next, onRefresh, onSave)
+            } catch (err) {
+                alert(`Error saving config: ${err.message}`)
+            }
+        })
 
         mainContent.onclick = async (event) => {
+            const fillBtn = event.target.closest('[data-config-fill-key]')
+            if (fillBtn) {
+                const key = fillBtn.dataset.configFillKey
+                const pair = fillBtn.closest('.config-pair')
+                if (!pair) return
+                const valueContainer = pair.querySelector('.config-value')
+                if (!valueContainer) return
+
+                if (fillBtn.dataset.isEditing === 'true') {
+                    // If already editing but blurred, re-focus
+                    const input = valueContainer.querySelector('.inline-config-input, .config-checkbox')
+                    if (input && input.style.display === 'none') {
+                        valueContainer.dispatchEvent(new Event('focusin', { bubbles: true }))
+                        input.focus()
+                    }
+                    return
+                }
+
+                const currentValue = fillBtn.dataset.configFillValue
+                const isEncryptedInitial = currentValue === '******'
+
+                const metaMap = await loadSettingsMeta()
+                const meta = metaMap[key] || {}
+                const type = meta.type || 'string'
+
+                fillBtn.dataset.isEditing = 'true'
+                fillBtn.classList.add('is-editing')
+
+                let inputEl
+                if (type === 'boolean') {
+                    inputEl = document.createElement('input')
+                    inputEl.className = 'config-checkbox'
+                    inputEl.type = 'checkbox'
+                    const normalizedValue = String(currentValue).toLowerCase()
+                    inputEl.checked = (normalizedValue === 'true' || normalizedValue === '1')
+                } else if (type === 'options' && meta.options) {
+                    inputEl = document.createElement('select')
+                    inputEl.className = 'terminal-input inline-config-input'
+                    meta.options.forEach((choice) => {
+                        const opt = document.createElement('option')
+                        opt.value = choice.value
+                        opt.textContent = choice.name
+                        if (String(choice.value) === String(currentValue)) {
+                            opt.selected = true
+                        }
+                        inputEl.appendChild(opt)
+                    })
+                } else {
+                    inputEl = document.createElement('input')
+                    inputEl.className = 'terminal-input inline-config-input'
+                    inputEl.type = type === 'number' ? 'number' : 'text'
+                    inputEl.value = isEncryptedInitial ? '' : currentValue
+                    inputEl.placeholder = isEncryptedInitial ? '(Enter new secret)' : 'Value'
+                }
+
+                const encryptCheck = document.createElement('input')
+                encryptCheck.type = 'checkbox'
+                encryptCheck.className = 'config-checkbox'
+                encryptCheck.checked = isEncryptedInitial
+
+                const encryptLabel = document.createElement('label')
+                encryptLabel.className = 'encrypt-label'
+                encryptLabel.appendChild(encryptCheck)
+                encryptLabel.appendChild(document.createTextNode('Encrypt'))
+
+                const unsavedMark = document.createElement('span')
+                unsavedMark.className = 'unsaved-mark'
+                unsavedMark.textContent = '*'
+                unsavedMark.style.display = 'none'
+
+                const staticView = document.createElement('code')
+                staticView.className = 'static-edit-view'
+                staticView.style.display = 'none'
+
+                const saveBtn = document.createElement('button')
+                saveBtn.className = 'terminal-run inline-save'
+                saveBtn.textContent = 'Save'
+
+                const cancelBtn = document.createElement('button')
+                cancelBtn.className = 'terminal-run inline-cancel'
+                cancelBtn.textContent = 'Cancel'
+
+                const actionArea = document.createElement('div')
+                actionArea.className = 'inline-actions'
+                actionArea.style.marginLeft = 'auto'
+                actionArea.appendChild(saveBtn)
+                actionArea.appendChild(cancelBtn)
+
+                const editorWrapper = document.createElement('div')
+                editorWrapper.className = 'inline-editor'
+                editorWrapper.appendChild(inputEl)
+                editorWrapper.appendChild(staticView)
+                editorWrapper.appendChild(unsavedMark)
+                editorWrapper.appendChild(encryptLabel)
+                editorWrapper.appendChild(actionArea)
+
+                const originalValueHtml = valueContainer.innerHTML
+                valueContainer.innerHTML = ''
+                valueContainer.appendChild(editorWrapper)
+
+                const getInputValue = () => {
+                    if (type === 'boolean') return String(inputEl.checked)
+                    return inputEl.value
+                }
+
+                const checkChanges = () => {
+                    const currentVal = getInputValue()
+                    const hasChanged = String(currentVal) !== String(currentValue) || encryptCheck.checked !== isEncryptedInitial
+                    unsavedMark.style.display = hasChanged ? 'inline-block' : 'none'
+                    staticView.textContent = currentVal || (isEncryptedInitial ? '******' : '(empty)')
+                }
+
+                inputEl.addEventListener('input', checkChanges)
+                inputEl.addEventListener('change', checkChanges)
+                encryptCheck.addEventListener('change', checkChanges)
+
+                let blurTimeout = null
+                editorWrapper.addEventListener('focusin', () => {
+                    if (blurTimeout) clearTimeout(blurTimeout)
+                    inputEl.style.display = (type === 'boolean') ? 'inline-block' : 'inline-block'
+                    encryptLabel.style.display = 'inline-flex'
+                    actionArea.style.display = 'flex'
+                    staticView.style.display = 'none'
+                })
+
+                editorWrapper.addEventListener('focusout', () => {
+                    blurTimeout = setTimeout(() => {
+                        if (!editorWrapper.contains(document.activeElement)) {
+                            inputEl.style.display = 'none'
+                            encryptLabel.style.display = 'none'
+                            actionArea.style.display = 'none'
+                            staticView.style.display = 'inline'
+                            checkChanges()
+                        }
+                    }, 150)
+                })
+
+                inputEl.focus()
+
+                const cleanup = () => {
+                    fillBtn.dataset.isEditing = 'false'
+                    fillBtn.classList.remove('is-editing')
+                    valueContainer.innerHTML = originalValueHtml
+                }
+
+                cancelBtn.onclick = (e) => {
+                    e.stopPropagation()
+                    cleanup()
+                }
+
+                saveBtn.onclick = async (e) => {
+                    e.stopPropagation()
+                    const newValue = getInputValue()
+                    const encryptValue = encryptCheck.checked
+                    try {
+                        await onSave(key, newValue, encryptValue)
+                        const next = await onRefresh()
+                        await renderConfig(next, onRefresh, onSave)
+                    } catch (err) {
+                        alert(`Error: ${err.message}`)
+                        cleanup()
+                    }
+                }
+            }
+
             const refreshBtn = event.target.closest('[data-config-refresh]')
             if (refreshBtn) {
                 const next = await onRefresh()
                 await renderConfig(next, onRefresh, onSave)
-                return
-            }
-
-            const useBtn = event.target.closest('[data-use-command]')
-            if (useBtn) {
-                onUseCommand(useBtn.dataset.useCommand || 'oa config')
-                return
-            }
-
-            const fillBtn = event.target.closest('[data-config-fill-key]')
-            if (fillBtn && keyInput && valueInput && encryptInput) {
-                keyInput.value = fillBtn.dataset.configFillKey || ''
-                valueInput.value = fillBtn.dataset.configFillValue || ''
-                encryptInput.checked = valueInput.value === '******'
-                keyInput.focus()
             }
         }
 
-        configForm?.addEventListener('submit', async (event) => {
-            event.preventDefault()
-            const key = String(keyInput?.value || '').trim()
-            const value = String(valueInput?.value || '')
-            const encrypt = Boolean(encryptInput?.checked)
+    }
 
-            if (!key) {
-                if (feedback) feedback.textContent = 'Key is required.'
-                return
-            }
+    const renderHelp = async () => {
+        mainContent.innerHTML = await renderSectionTemplate('help')
+        mainContent.onclick = null
+    }
 
-            if (feedback) feedback.textContent = 'Saving...'
-            const next = await onSave({ key, value, encrypt })
-            if (!next?.ok) {
-                if (feedback) feedback.textContent = next?.error || 'Unable to save config.'
-                return
-            }
-
-            await renderConfig(next, onRefresh, onSave)
-            const nextFeedback = mainContent.querySelector('#config-feedback')
-            if (nextFeedback) {
-                nextFeedback.textContent = `Saved ${key}.`
-            }
+    const renderContext = async (contextData) => {
+        mainContent.innerHTML = await renderSectionTemplate('context', {
+            ENV: escapeHtml(contextData.env),
+            TENANT: escapeHtml(contextData.tenant),
+            ORGANIZATION: escapeHtml(contextData.organization),
+            APPLICATION: escapeHtml(contextData.application),
+            USER_NAME: escapeHtml(contextData.user),
+            USER_ROLE: escapeHtml(contextData.role),
+            SESSION_TOKEN: escapeHtml(contextData.session?.token ? `${contextData.session.token.slice(0, 10)}...` : 'N/A'),
+            SESSION_EXPIRES: escapeHtml(contextData.session?.expiresAt || 'N/A'),
+            SESSION_REMAINING: escapeHtml(contextData.session?.remainingMs != null ? `${Math.floor(contextData.session.remainingMs / 1000)}s` : 'N/A')
         })
+
+        const groups = mainContent.querySelectorAll('.config-group-card')
+        groups.forEach((group) => {
+            const h3 = group.querySelector('h3')
+            const footer = document.createElement('section')
+            footer.className = 'details-footer'
+            footer.style.marginTop = '1rem'
+            footer.style.borderTop = '1px solid var(--border-color)'
+            footer.style.paddingTop = '1rem'
+            
+            const actionDiv = document.createElement('div')
+            actionDiv.className = 'example-actions'
+
+            const addCopyUrl = (label, segment) => {
+                const btn = document.createElement('button')
+                btn.type = 'button'
+                btn.className = 'copy-btn'
+                btn.textContent = `Copy ${label} JSON URL`
+                btn.onclick = async () => {
+                    const url = `${window.location.origin}/$context/${segment}`
+                    await copyText(url, btn)
+                }
+                actionDiv.appendChild(btn)
+            }
+
+            if (h3.textContent === 'SESSION') {
+                addCopyUrl('Session', 'session')
+            } else if (h3.textContent === 'WORKSPACE') {
+                addCopyUrl('Env', 'env')
+                addCopyUrl('Tenant', 'tenant')
+                addCopyUrl('Org', 'organization')
+                addCopyUrl('App', 'application')
+            } else if (h3.textContent === 'USER') {
+                addCopyUrl('User', 'user')
+                addCopyUrl('Role', 'role')
+            }
+
+            footer.appendChild(actionDiv)
+            group.appendChild(footer)
+        })
+
+        mainContent.onclick = null
     }
 
     return {
         renderHome,
         renderDirectoryContent,
-        renderConfig
+        renderConfig,
+        renderHelp,
+        renderContext
     }
 }

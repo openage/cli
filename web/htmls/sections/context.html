@@ -1,0 +1,66 @@
+<section class="hero">
+  <div>
+    <h1>Context Summary</h1>
+    <div class="tag">Live Sessions</div>
+  </div>
+  <p class="summary">Current operational context and session details.</p>
+</section>
+
+<div class="config-groups">
+  <section class="card config-group-card">
+    <h3>SESSION</h3>
+    <p class="summary">Active authentication and timing data.</p>
+    <div class="config-list">
+      <div class="config-pair">
+        <div class="config-key">Token:</div>
+        <div class="config-value"><code>{{SESSION_TOKEN}}</code></div>
+      </div>
+      <div class="config-pair">
+        <div class="config-key">Expires:</div>
+        <div class="config-value"><code>{{SESSION_EXPIRES}}</code></div>
+      </div>
+      <div class="config-pair">
+        <div class="config-key">Remaining:</div>
+        <div class="config-value"><code>{{SESSION_REMAINING}}</code></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card config-group-card">
+    <h3>WORKSPACE</h3>
+    <p class="summary">Environment and organizational mapping.</p>
+    <div class="config-list">
+      <div class="config-pair">
+        <div class="config-key">Environment:</div>
+        <div class="config-value"><code>{{ENV}}</code></div>
+      </div>
+      <div class="config-pair">
+        <div class="config-key">Tenant:</div>
+        <div class="config-value"><code>{{TENANT}}</code></div>
+      </div>
+      <div class="config-pair">
+        <div class="config-key">Organization:</div>
+        <div class="config-value"><code>{{ORGANIZATION}}</code></div>
+      </div>
+      <div class="config-pair">
+        <div class="config-key">Application:</div>
+        <div class="config-value"><code>{{APPLICATION}}</code></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card config-group-card">
+    <h3>USER</h3>
+    <p class="summary">Identity and access level.</p>
+    <div class="config-list">
+      <div class="config-pair">
+        <div class="config-key">Name:</div>
+        <div class="config-value"><code>{{USER_NAME}}</code></div>
+      </div>
+      <div class="config-pair">
+        <div class="config-key">Role:</div>
+        <div class="config-value"><code>{{USER_ROLE}}</code></div>
+      </div>
+    </div>
+  </section>
+</div>

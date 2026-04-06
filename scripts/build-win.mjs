@@ -53,6 +53,14 @@ if (existsSync(webDest)) {
 }
 cpSync(webSource, webDest, { recursive: true })
 
+// Copy setup template for init command
+const setupSource = join(root, 'setup')
+const setupDest = join(distFolder, 'setup')
+if (existsSync(setupDest)) {
+    rmSync(setupDest, { recursive: true, force: true })
+}
+cpSync(setupSource, setupDest, { recursive: true })
+
 // Create zip file for distribution
 const zipName = `oa-cli-v${version}-windows.zip`
 const zipPath = join(distFolder, zipName)
@@ -64,7 +72,7 @@ copyFileSync(readmeSrc, readmeDest)
 
 try {
     execSync(
-        `powershell "Compress-Archive -Path '${destExe}', '${readmeDest}', '${webDest}' -DestinationPath '${zipPath}' -Force"`,
+        `powershell "Compress-Archive -Path '${destExe}', '${readmeDest}', '${webDest}', '${setupDest}' -DestinationPath '${zipPath}' -Force"`,
         { stdio: 'inherit' }
     )
     console.log('\nDistribution package created:', zipPath)

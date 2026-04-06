@@ -226,7 +226,7 @@ export const createTerminalUi = ({ terminalHost, onExecute, getPendingCommand, s
             <p class="summary">Shortcuts: Ctrl+Enter run, Ctrl+L clear</p>
             <pre id="terminal-output" class="terminal-output"></pre>
             <div class="terminal-bottom">
-              <p class="summary">Allowed: pull, push, script, serve, config, test</p>
+              <p class="summary">Allowed: pull, push, script, serve, config, context, test</p>
               <form id="terminal-form" class="terminal-form terminal-form-sticky">
                 <input id="terminal-input" class="terminal-input" type="text" value="${escapeHtml(getPendingCommand())}" autocomplete="off" />
                 <button class="terminal-run" type="submit">Run</button>

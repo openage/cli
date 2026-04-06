@@ -34,7 +34,7 @@ process.env.NODE_ENV = process.env.NODE_ENV || context.env()
 const _run = async () => {
     let cmd
     // If in interactive mode, prompt user for command
-    if (settings.get('interactive')) {
+    if (settings.get('ux.interactive')) {
         cmd = await input.get('cmd')
     } else {
         // Otherwise use default 'run' action
@@ -44,7 +44,7 @@ const _run = async () => {
     try {
         await command.execute(cmd)
     } catch (e) {
-        settings.set('interactive', true)
+        settings.set('ux.interactive', true)
         log.error(e)
     }
     await _run()
@@ -53,7 +53,7 @@ const _run = async () => {
 const init = async () => {
     log.debug('Getting Config')
     await application.init()
-    if (settings.get('interactive')) {
+    if (settings.get('ux.interactive')) {
         context.show()
     }
 
@@ -75,7 +75,7 @@ const init = async () => {
             await command.execute(constant.actions.get('script'), { _: ['script', cmd] })
         }
     } else {
-        settings.set('interactive', true)
+        settings.set('ux.interactive', true)
         await _run()
     }
 }

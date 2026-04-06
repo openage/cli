@@ -1,0 +1,59 @@
+<section class="hero help-hero">
+    <div>
+        <h1>Help & Documentation</h1>
+        <div class="tag">Guide</div>
+    </div>
+    <p class="summary">Learn how to use OA CLI via the Web interface and the Command Line.</p>
+</section>
+
+<div class="help-grid">
+    <section class="card help-card">
+        <h3><span class="icon" aria-hidden="true">🌐</span> Web Interface Usage</h3>
+        <ul class="content-list help-list">
+            <li><strong>Directory Browser:</strong> Use the left sidebar to navigate between <em>Data</em> ($content), <em>Specs</em> ($specs), and <em>Config</em>.</li>
+            <li><strong>Resource Management:</strong> Click on files to view metadata, schemas, and git status. Use the "Pull" and "Push" buttons to sync with remote services.</li>
+            <li><strong>Terminal Sidebar:</strong> The right sidebar allows you to execute commands directly. Clicking "Edit" or "Pull/Push" in the UI will pre-fill the terminal for you.</li>
+            <li><strong>Live Config:</strong> Manage your <code>settings.json</code> directly in the Config section with support for encrypted values.</li>
+            <li><strong>Workspace Sync:</strong> The status bar at the bottom shows your current Git branch and pending changes across the workspace.</li>
+        </ul>
+    </section>
+
+    <section class="card help-card">
+        <h3><span class="icon" aria-hidden="true">💻</span> CLI Usage</h3>
+        <ul class="content-list help-list">
+            <li><code>oa pull [path]</code>: Fetch data from remote services to your local workspace.</li>
+            <li><code>oa push [path]</code>: Send local modifications back to the remote service.</li>
+            <li><code>oa test [path]</code>: Run JSON-based test specifications with full request/response validation.</li>
+            <li><code>oa init</code>: Bootstrap a new project structure, initialize Git, and provision remote application settings.</li>
+            <li><code>oa validate [path]</code>: Verify JSON files against their schemas (Draft 2020-12) with support for <code>$ref</code> and automated folder mapping.</li>
+            <li><code>oa config [key] [value]</code>: View or update CLI settings (e.g., <code>oa config logger.level debug</code>).</li>
+            <li><code>oa remote [file] [url]</code>: Map a local file to a remote resource URL for easy syncing.</li>
+            <li><code>oa serve</code>: Start this interactive web documentation server locally.</li>
+        </ul>
+        <div class="example-box">
+            <p><strong>Project Lifecycle:</strong></p>
+            <code>oa init</code>
+            <p><strong>Validation:</strong></p>
+            <code>oa validate ./data/system/applications/console.json</code>
+            <p class="summary">Pro tip: Use <code>--help</code> with any command for detailed options.</p>
+        </div>
+    </section>
+
+    <section class="card help-card full-width">
+        <h3><span class="icon" aria-hidden="true">⚙️</span> Key Concepts</h3>
+        <div class="concept-grid">
+            <div class="concept-item">
+                <h4>Project Bootstrap</h4>
+                <p><code>oa init</code> sets up your directory structure, secret keys, and Git state. It also offers to provision your application on the remote server interactively.</p>
+            </div>
+            <div class="concept-item">
+                <h4>Self-Healing Index</h4>
+                <p>When you validate a file in a new folder, OA asks which schema to use and remembers it. This self-healing behavior automates your schema mapping as you build.</p>
+            </div>
+            <div class="concept-item">
+                <h4>$prefixes</h4>
+                <p>Use <code>$content</code>, <code>$specs</code>, and <code>$oa</code> to refer to standard workspace locations (like <code>.data</code> and <code>.oa</code>) reliably.</p>
+            </div>
+        </div>
+    </section>
+</div>

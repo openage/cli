@@ -1,4 +1,5 @@
 import { readJsonBody, sendJson } from './common.js'
+import inputsMetadata from '../../lib/constants/inputs.js'
 
 const parseConfigValue = (value) => {
     if (typeof value !== 'string') return value
@@ -10,6 +11,11 @@ const parseConfigValue = (value) => {
 }
 
 export const handleConfigApi = ({ req, res, configFolder, executeCliCommand, settings, logger }) => {
+    if (req.url && req.url === '/api/config-metadata' && req.method === 'GET') {
+        sendJson(res, 200, { ok: true, data: inputsMetadata })
+        return true
+    }
+
     if (!(req.url && req.url.startsWith('/api/config'))) {
         return false
     }

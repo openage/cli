@@ -3,6 +3,10 @@ import { formatRemaining } from './modules/utils.js'
 import { createGitUi } from './modules/git-ui.js'
 import { createTerminalUi } from './modules/terminal-ui.js'
 import { createContentUi } from './modules/content-ui.js'
+import { createThemeUi } from './modules/theme-ui.js'
+import { ui } from './modules/ui.js'
+
+const themeUi = createThemeUi()
 
 const mainContent = document.querySelector('#main-content')
 const dirList = document.querySelector('#dir-list')
@@ -26,12 +30,15 @@ let currentTenant = ''
 let currentUser = ''
 let isTerminalVisible = true
 
-const cardCommands = commands.filter((cmd) => ['pull', 'push', 'script', 'config', 'test'].includes(cmd.name))
+const cardCommands = commands.filter((cmd) => ['init', 'validate', 'pull', 'push', 'script', 'config', 'context', 'test'].includes(cmd.name))
 const commandIcons = {
+    init: '\u26A1',
+    validate: '\u2611',
     pull: '\u2B07',
     push: '\u2B06',
     script: '\u2699',
     config: '\u2692',
+    context: '\u25C9',
     test: '\u2713'
 }
 
@@ -66,6 +73,8 @@ const getSectionLabel = (section) => {
     if (section === 'data') return 'Data'
     if (section === 'specs') return 'Specs'
     if (section === 'config') return 'Config'
+    if (section === 'context') return 'Context'
+    if (section === 'help') return 'Help'
     return 'Overview'
 }
 
@@ -114,38 +123,45 @@ const renderHeaderBreadcrumb = () => {
     headerBreadcrumb.innerHTML = crumbs.join('')
 }
 
-if (headerBreadcrumb) {
-    headerBreadcrumb.addEventListener('click', async (event) => {
-        const crumb = event.target.closest('[data-crumb-path]')
-        if (!crumb) return
-
-        const targetPath = crumb.dataset.crumbPath || ''
-
-        if (!targetPath) {
-            await openOverview()
-            await renderDirectoryNav('', 'overview')
-            return
-        }
-
-        if (currentSection === 'data' || currentSection === 'specs') {
-            await openDirectory(targetPath, currentSection)
-            await renderDirectoryNav(targetPath, currentSection)
-            return
-        }
-
-        if (currentSection === 'config') {
-            await openConfig()
-            return
-        }
-    })
+const parseFragmentState = () => {
+    const raw = window.location.hash?.replace(/^#/, '').trim()
+    if (!raw) return {}
+    const params = new URLSearchParams(raw)
+    const section = params.get('section') || ''
+    const path = params.get('path') || ''
+    const terminal = params.get('terminal')
+    return {
+        section,
+        path,
+        terminal: terminal == null ? null : terminal !== '0'
+    }
 }
 
-const renderSessionTimeLeft = () => {
-    const sessionLeft = statusBar.querySelector('[data-context-key="sessionRemaining"]')
-    if (!sessionLeft) return
+const syncFragmentState = () => {
+    const params = new URLSearchParams()
+    params.set('section', currentSection || 'overview')
+    if (currentPath) params.set('path', currentPath)
+    params.set('terminal', isTerminalVisible ? '1' : '0')
+    const next = `#${params.toString()}`
+    if (window.location.hash !== next) {
+        window.history.replaceState(null, '', next)
+    }
+}
 
-    const remaining = sessionExpiryMs == null ? null : Math.max(0, sessionExpiryMs - Date.now())
-    sessionLeft.textContent = formatRemaining(remaining)
+const refreshTerminalTabLabel = () => {
+    if (!terminalToggleTab) return
+    terminalToggleTab.textContent = `${isTerminalVisible ? 'x' : '>_'}`
+}
+
+const setTerminalVisibility = (visible, skipSave = false) => {
+    isTerminalVisible = Boolean(visible)
+    appRoot?.classList.toggle('terminal-collapsed', !isTerminalVisible)
+    refreshTerminalTabLabel()
+    syncFragmentState()
+
+    if (!skipSave) {
+        saveConfig({ key: 'ux.terminal.mode', value: isTerminalVisible ? 'expanded' : 'collapsed', encrypt: false })
+    }
 }
 
 const terminalUi = createTerminalUi({
@@ -192,7 +208,11 @@ const saveConfig = async ({ key, value, encrypt }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key, value, encrypt })
     })
-    return res.json()
+    const data = await res.json()
+    if (key.startsWith('ux.')) {
+        await loadContext()
+    }
+    return data
 }
 
 const loadMeta = async (path = '$content', metaFile = '') => {
@@ -223,43 +243,6 @@ const getRootPathForSection = (section) => {
     return ''
 }
 
-const parseFragmentState = () => {
-    const raw = window.location.hash?.replace(/^#/, '').trim()
-    if (!raw) return {}
-    const params = new URLSearchParams(raw)
-    const section = params.get('section') || ''
-    const path = params.get('path') || ''
-    const terminal = params.get('terminal')
-    return {
-        section,
-        path,
-        terminal: terminal == null ? null : terminal !== '0'
-    }
-}
-
-const syncFragmentState = () => {
-    const params = new URLSearchParams()
-    params.set('section', currentSection || 'overview')
-    if (currentPath) params.set('path', currentPath)
-    params.set('terminal', isTerminalVisible ? '1' : '0')
-    const next = `#${params.toString()}`
-    if (window.location.hash !== next) {
-        window.history.replaceState(null, '', next)
-    }
-}
-
-const refreshTerminalTabLabel = () => {
-    if (!terminalToggleTab) return
-    terminalToggleTab.textContent = `${isTerminalVisible ? 'x' : '>_'}`
-}
-
-const setTerminalVisibility = (visible) => {
-    isTerminalVisible = Boolean(visible)
-    appRoot?.classList.toggle('terminal-collapsed', !isTerminalVisible)
-    refreshTerminalTabLabel()
-    syncFragmentState()
-}
-
 const openOverview = async () => {
     currentPath = ''
     currentSection = 'overview'
@@ -269,17 +252,40 @@ const openOverview = async () => {
     syncFragmentState()
 }
 
+const openHelp = async () => {
+    currentPath = ''
+    currentSection = 'help'
+    refreshTopbar()
+    renderHeaderBreadcrumb()
+    await contentUi.renderHelp()
+    syncFragmentState()
+}
+
+const openContext = async () => {
+    currentPath = ''
+    currentSection = 'context'
+    refreshTopbar()
+    renderHeaderBreadcrumb()
+    const res = await fetch('/api/context')
+    const data = await res.json()
+    await contentUi.renderContext(data)
+    syncFragmentState()
+}
+
 const openConfig = async () => {
     currentPath = ''
     currentSection = 'config'
     refreshTopbar()
     renderHeaderBreadcrumb()
+    ui.progress({ label: 'Loading Config', value: 40, message: 'Reading settings from disk...' })
     const payload = await loadConfig()
+    ui.progress({ value: 100, message: 'Rendering configuration editor...' })
     await contentUi.renderConfig(
         payload,
         async () => loadConfig(),
-        async (nextPayload) => saveConfig(nextPayload)
+        async (key, value, encrypt) => saveConfig({ key, value, encrypt })
     )
+    ui.progress(false)
     syncFragmentState()
 }
 
@@ -288,9 +294,12 @@ const openDirectory = async (path = '', section = currentSection) => {
     currentPath = path
     refreshTopbar()
     renderHeaderBreadcrumb()
+    ui.progress({ label: 'Navigating', value: 20, message: `Entering ${path || 'root'}...` })
     const entries = await loadDirectoryEntries(path)
     const metaEnabled = currentSection === 'data' || currentSection === 'specs'
+    ui.progress({ value: 50, message: 'Scanning for metadata and Git status...' })
     const metaPayload = metaEnabled ? await loadMeta(path || '$content') : null
+    ui.progress({ value: 80, message: 'Rendering directory view...' })
     await contentUi.renderDirectoryContent(
         path,
         entries,
@@ -318,6 +327,7 @@ const openDirectory = async (path = '', section = currentSection) => {
             loadEntries: async (targetPath) => loadDirectoryEntries(targetPath)
         }
     )
+    ui.progress(false)
     syncFragmentState()
 }
 
@@ -349,28 +359,25 @@ const renderDirectoryNav = async (path = currentPath, section = currentSection) 
 
         dirList.innerHTML = `
           <div class="nav-group">
-            <h4>Overview</h4>
-            <button type="button" class="nav-link" data-page="overview">Home</button>
-          </div>
-          <div class="nav-group">
-            <h4>Data</h4>
+            <h4>OPERATIONS</h4>
+            <button type="button" class="nav-link ${section === 'overview' ? 'is-active' : ''}" data-page="overview">Home</button>
             <button type="button" class="nav-link ${section === 'data' ? 'is-active' : ''}" data-page="data">Open Data</button>
             ${section === 'data' ? `
               ${activePath !== rootPath ? `<button type="button" class="nav-link" data-section="data" data-dir-path="${parentPath}">..</button>` : ''}
               ${folderRows || '<p class="summary">No folders</p>'}
             ` : ''}
-          </div>
-          <div class="nav-group">
-            <h4>Specs</h4>
             <button type="button" class="nav-link ${section === 'specs' ? 'is-active' : ''}" data-page="specs">Open Specs</button>
             ${section === 'specs' ? `
               ${activePath !== rootPath ? `<button type="button" class="nav-link" data-section="specs" data-dir-path="${parentPath}">..</button>` : ''}
               ${folderRows || '<p class="summary">No folders</p>'}
             ` : ''}
           </div>
+          
           <div class="nav-group">
-            <h4>Config</h4>
+            <h4>SYSTEM</h4>
             <button type="button" class="nav-link ${section === 'config' ? 'is-active' : ''}" data-page="config">Open Config</button>
+            <button type="button" class="nav-link ${section === 'context' ? 'is-active' : ''}" data-page="context">Open Context</button>
+            <button type="button" class="nav-link ${section === 'help' ? 'is-active' : ''}" data-page="help">Help</button>
           </div>
         `
 
@@ -381,6 +388,11 @@ const renderDirectoryNav = async (path = currentPath, section = currentSection) 
                 if (page === 'overview') {
                     await openOverview()
                     await renderDirectoryNav('', 'overview')
+                    return
+                }
+                if (page === 'help') {
+                    await openHelp()
+                    await renderDirectoryNav('', 'help')
                     return
                 }
                 if (page === 'data') {
@@ -398,6 +410,11 @@ const renderDirectoryNav = async (path = currentPath, section = currentSection) 
                 if (page === 'config') {
                     await openConfig()
                     await renderDirectoryNav('', 'config')
+                    return
+                }
+                if (page === 'context') {
+                    await openContext()
+                    await renderDirectoryNav('', 'context')
                     return
                 }
             }
@@ -421,13 +438,26 @@ const renderDirectoryNav = async (path = currentPath, section = currentSection) 
     }
 }
 
+const renderSessionTimeLeft = () => {
+    const sessionLeft = statusBar.querySelector('[data-context-key="sessionRemaining"]')
+    if (!sessionLeft) return
+
+    const remaining = sessionExpiryMs == null ? null : Math.max(0, sessionExpiryMs - Date.now())
+    sessionLeft.textContent = formatRemaining(remaining)
+}
+
 const loadContext = async () => {
     try {
+        ui.progress({ label: 'Loading Context', value: 20, message: 'Fetching session and environment details...' })
         const res = await fetch('/api/context')
         if (!res.ok) {
             throw new Error('Context endpoint error')
         }
+        ui.progress({ value: 60, message: 'Processing application state...' })
         const data = await res.json()
+        window.oaContext = data
+        themeUi.init(data.settings)
+        ui.init(data.settings)
         currentEnv = data.env || 'prod'
         currentTenant = data.tenant || ''
         currentUser = data.user || ''
@@ -435,14 +465,18 @@ const loadContext = async () => {
         renderHeaderBreadcrumb()
         refreshTerminalTabLabel()
 
-        statusBar.innerHTML = ''
-        renderStatusItem('Organization', data.organization)
-        renderStatusItem('Application', data.application)
-        renderStatusItem('Role', data.role)
+        const brandArea = document.querySelector('.brand > div')
+        if (brandArea && data.web) {
+            const token = data.session?.token || ''
+            const url = `${data.web.startsWith('http') ? data.web : `https://${data.web}`}?session-token=${token}`
+            brandArea.innerHTML = `<strong>OA CLI</strong><br /><a href="${url}" target="_blank" class="brand-host" title="Open ${data.web} in new tab">${data.web}</a>`
+        }
 
+        statusBar.innerHTML = ''
         sessionExpiryMs = data.session?.expiresAt ? new Date(data.session.expiresAt).getTime() : null
         renderStatusItem('Session Left', formatRemaining(data.session?.remainingMs), 'sessionRemaining')
 
+        ui.progress({ value: 80, message: 'Refreshing Git status...' })
         if (sessionCountdownTimer) {
             window.clearInterval(sessionCountdownTimer)
             sessionCountdownTimer = null
@@ -460,17 +494,64 @@ const loadContext = async () => {
                 gitUi.loadGitStatus()
             }, 15000)
         }
+        ui.progress(false)
     } catch {
+        ui.progress(false)
         statusBar.innerHTML = '<span class="status-item"><span class="status-label">Status:</span><span class="status-value">Unable to load context.</span></span>'
     }
 }
 
 const init = async () => {
+    await loadContext()
+
+    if (headerBreadcrumb) {
+        headerBreadcrumb.addEventListener('click', async (event) => {
+            const crumb = event.target.closest('[data-crumb-path]')
+            if (!crumb) return
+
+            const targetPath = crumb.dataset.crumbPath || ''
+
+            if (!targetPath) {
+                await openOverview()
+                await renderDirectoryNav('', 'overview')
+                return
+            }
+
+            if (currentSection === 'data' || currentSection === 'specs') {
+                await openDirectory(targetPath, currentSection)
+                await renderDirectoryNav(targetPath, currentSection)
+                return
+            }
+
+            if (currentSection === 'config') {
+                await openConfig()
+                return
+            }
+            
+            if (currentSection === 'help') {
+                await openHelp()
+                return
+            }
+        })
+    }
+
     gitUi.ensureGitPopup()
     terminalUi.render()
     terminalToggleTab?.addEventListener('click', () => {
         setTerminalVisibility(!isTerminalVisible)
     })
+
+    try {
+        const config = await loadConfig()
+        const terminalMode = config?.data?.['ux.terminal.mode']
+        if (terminalMode === 'collapsed') {
+            isTerminalVisible = false
+        } else if (terminalMode === 'expanded') {
+            isTerminalVisible = true
+        }
+    } catch {
+        // ignore
+    }
 
     const fragmentState = parseFragmentState()
     if (fragmentState.terminal != null) {
@@ -490,14 +571,19 @@ const init = async () => {
     } else if (section === 'config') {
         await openConfig()
         await renderDirectoryNav('', 'config')
+    } else if (section === 'context') {
+        await openContext()
+        await renderDirectoryNav('', 'context')
+    } else if (section === 'help') {
+        await openHelp()
+        await renderDirectoryNav('', 'help')
     } else {
         await openOverview()
         await renderDirectoryNav('', 'overview')
     }
 
-    await loadContext()
     gitUi.bindStatusBarToggle()
-    setTerminalVisibility(isTerminalVisible)
+    setTerminalVisibility(isTerminalVisible, true)
 }
 
 init()
