@@ -162,16 +162,49 @@ const tabular = (title, data, styles) => {
     console.log(table.toString())
 }
 
+const formatError = (error) => {
+    if (!error) {
+        return ''
+    }
+
+    let output = ''
+    if (error.stack) {
+        output += error.stack
+    } else if (error.message) {
+        output += error.message
+    } else {
+        output += String(error)
+    }
+
+    if (error.cause) {
+        output += '\nCaused by: '
+        if (error.cause instanceof Error) {
+            output += error.cause.stack || error.cause.message || String(error.cause)
+        } else if (typeof error.cause === 'object') {
+            output += JSON.stringify(error.cause, null, 2)
+        } else {
+            output += String(error.cause)
+        }
+    }
+
+    return output
+}
+
 export const message = (message, style) => {
     style = style || 'default'
     console.log(render[style](message))
 }
 
 export const error = (error) => {
-    console.error(
-        chalk.bgRed.white.bold('🚨  Error: '),
-        chalk.red(error?.message)
-    )
+    if (typeof error === 'string') {
+        error = new Error(error)
+    }
+
+    console.error(chalk.bgRed.white.bold('🚨  Error:'), chalk.red(error.message || String(error)))
+    const details = formatError(error)
+    if (details) {
+        console.error(chalk.red(details))
+    }
 }
 
 export const dialog = (title, message, actions) => {
