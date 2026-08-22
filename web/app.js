@@ -21,6 +21,7 @@ const headerBreadcrumb = document.querySelector('#header-breadcrumb')
 
 let sessionCountdownTimer = null
 let sessionExpiryMs = null
+let sessionStatus = ''
 let gitRefreshTimer = null
 let pendingTerminalCommand = 'oa pull'
 let currentPath = ''
@@ -29,6 +30,7 @@ let currentEnv = 'prod'
 let currentTenant = ''
 let currentUser = ''
 let isTerminalVisible = true
+let pinnedPaths = []
 
 const cardCommands = commands.filter((cmd) => ['init', 'validate', 'pull', 'push', 'script', 'config', 'context', 'test'].includes(cmd.name))
 const commandIcons = {
@@ -75,6 +77,7 @@ const getSectionLabel = (section) => {
     if (section === 'config') return 'Config'
     if (section === 'context') return 'Context'
     if (section === 'help') return 'Help'
+    if (section === 'pinned') return 'Pinned'
     return 'Overview'
 }
 
@@ -185,7 +188,16 @@ const contentUi = createContentUi({
     cardCommands,
     commandIcons,
     onUseCommand: (command) => terminalUi.setCommand(command),
-    onAddLocalPath: (relativePath) => terminalUi.upsertLocalPath(relativePath)
+    onAddLocalPath: (relativePath) => terminalUi.upsertLocalPath(relativePath),
+    isPinned: (filePath) => pinnedPaths.includes(filePath),
+    onTogglePin: async (filePath) => {
+        pinnedPaths = pinnedPaths.includes(filePath)
+            ? pinnedPaths.filter((item) => item !== filePath)
+            : [...pinnedPaths, filePath]
+        await saveConfig({ key: 'ux.pinned.files', value: pinnedPaths, encrypt: false })
+        await renderDirectoryNav(currentPath, currentSection)
+        return pinnedPaths.includes(filePath)
+    }
 })
 
 const gitUi = createGitUi({ statusBar })
@@ -272,6 +284,48 @@ const openContext = async () => {
     syncFragmentState()
 }
 
+const openPinned = async () => {
+    currentPath = ''
+    currentSection = 'pinned'
+    refreshTopbar()
+    renderHeaderBreadcrumb()
+    const renderPinnedRows = (root) => pinnedPaths
+        .filter((filePath) => filePath.startsWith(`${root}/`))
+        .map((filePath) => {
+            const parts = String(filePath).split('/').filter(Boolean)
+            const name = parts.at(-1) || filePath
+            const relativePath = `${root === '$content' ? 'data' : 'specs'}/${parts.slice(1, -1).join('/')}`
+            return `<article class="dir-row card is-file" data-pinned-path="${escapeHtml(filePath)}">
+                            <div class="file-row-main"><span class="file-icon">{}</span><div class="pinned-file-info"><span class="summary pinned-path">${escapeHtml(relativePath)}/</span><a class="file-name file-link" href="#" data-pinned-open="${escapeHtml(filePath)}" title="Open ${escapeHtml(name)}">${escapeHtml(name)}</a></div></div>
+              <div class="file-actions"><button type="button" class="copy-btn" data-pinned-remove="${escapeHtml(filePath)}">Unpin</button></div>
+            </article>`
+        }).join('')
+    const dataRows = renderPinnedRows('$content')
+    const specsRows = renderPinnedRows('$specs')
+    const renderGroup = (title, rows) => `<section class="pinned-group"><h3>${title}</h3>${rows || '<p class="summary">No pinned JSON files.</p>'}</section>`
+    mainContent.innerHTML = `<section class="pinned-groups">${renderGroup('Data', dataRows)}${renderGroup('Specs', specsRows)}</section>`
+    mainContent.onclick = async (event) => {
+        const open = event.target.closest('[data-pinned-open]')
+        if (open) {
+            event.preventDefault()
+            const filePath = open.dataset.pinnedOpen || ''
+            const section = filePath.startsWith('$specs/') ? 'specs' : 'data'
+            const parentPath = filePath.slice(0, filePath.lastIndexOf('/')) || getRootPathForSection(section)
+            await openDirectory(parentPath, section, filePath)
+            await renderDirectoryNav(parentPath, section)
+            return
+        }
+
+        const remove = event.target.closest('[data-pinned-remove]')
+        if (!remove) return
+        pinnedPaths = pinnedPaths.filter((item) => item !== remove.dataset.pinnedRemove)
+        await saveConfig({ key: 'ux.pinned.files', value: pinnedPaths, encrypt: false })
+        await openPinned()
+        await renderDirectoryNav('', 'pinned')
+    }
+    syncFragmentState()
+}
+
 const openConfig = async () => {
     currentPath = ''
     currentSection = 'config'
@@ -289,7 +343,7 @@ const openConfig = async () => {
     syncFragmentState()
 }
 
-const openDirectory = async (path = '', section = currentSection) => {
+const openDirectory = async (path = '', section = currentSection, selectedPath = '') => {
     currentSection = section
     currentPath = path
     refreshTopbar()
@@ -324,7 +378,8 @@ const openDirectory = async (path = '', section = currentSection) => {
             loadMeta: async (targetPath, metaFile) => loadMeta(targetPath, metaFile),
             saveMeta: async (payloadToSave) => saveMeta(payloadToSave),
             loadGitDiff: async (targetPath) => loadGitDiff(targetPath),
-            loadEntries: async (targetPath) => loadDirectoryEntries(targetPath)
+            loadEntries: async (targetPath) => loadDirectoryEntries(targetPath),
+            selectedPath
         }
     )
     ui.progress(false)
@@ -361,16 +416,17 @@ const renderDirectoryNav = async (path = currentPath, section = currentSection) 
           <div class="nav-group">
             <h4>OPERATIONS</h4>
             <button type="button" class="nav-link ${section === 'overview' ? 'is-active' : ''}" data-page="overview">Home</button>
-            <button type="button" class="nav-link ${section === 'data' ? 'is-active' : ''}" data-page="data">Open Data</button>
+            <button type="button" class="nav-link ${section === 'data' ? 'is-active' : ''}" data-page="data">Data</button>
             ${section === 'data' ? `
               ${activePath !== rootPath ? `<button type="button" class="nav-link" data-section="data" data-dir-path="${parentPath}">..</button>` : ''}
               ${folderRows || '<p class="summary">No folders</p>'}
             ` : ''}
-            <button type="button" class="nav-link ${section === 'specs' ? 'is-active' : ''}" data-page="specs">Open Specs</button>
+            <button type="button" class="nav-link ${section === 'specs' ? 'is-active' : ''}" data-page="specs">Specs</button>
             ${section === 'specs' ? `
               ${activePath !== rootPath ? `<button type="button" class="nav-link" data-section="specs" data-dir-path="${parentPath}">..</button>` : ''}
               ${folderRows || '<p class="summary">No folders</p>'}
             ` : ''}
+            <button type="button" class="nav-link ${section === 'pinned' ? 'is-active' : ''}" data-page="pinned">Pinned</button>
           </div>
           
           <div class="nav-group">
@@ -405,6 +461,11 @@ const renderDirectoryNav = async (path = currentPath, section = currentSection) 
                     const root = getRootPathForSection('specs')
                     await openDirectory(root, 'specs')
                     await renderDirectoryNav(root, 'specs')
+                    return
+                }
+                if (page === 'pinned') {
+                    await openPinned()
+                    await renderDirectoryNav('', 'pinned')
                     return
                 }
                 if (page === 'config') {
@@ -444,6 +505,35 @@ const renderSessionTimeLeft = () => {
 
     const remaining = sessionExpiryMs == null ? null : Math.max(0, sessionExpiryMs - Date.now())
     sessionLeft.textContent = formatRemaining(remaining)
+    const statusItem = sessionLeft.closest('.status-item')
+    const existingButton = statusItem?.querySelector('[data-renew-session]')
+    const isExpired = (remaining !== null && remaining <= 0) || sessionStatus.toLowerCase() === 'expired'
+    if (isExpired) {
+        if (!existingButton) {
+            const renewButton = document.createElement('button')
+            renewButton.type = 'button'
+            renewButton.className = 'status-item-button'
+            renewButton.dataset.renewSession = 'true'
+            renewButton.textContent = 'Renew'
+            statusItem?.appendChild(renewButton)
+        }
+    } else {
+        existingButton?.remove()
+    }
+}
+
+const renewSession = async (button) => {
+    button.disabled = true
+    button.textContent = 'Renewing...'
+    try {
+        const res = await fetch('/api/auth/renew', { method: 'POST' })
+        if (!res.ok) throw new Error('Authentication failed')
+        await loadContext()
+    } catch {
+        button.disabled = false
+        button.textContent = 'Renew'
+        alert('Authentication failed. Please try again.')
+    }
 }
 
 const loadContext = async () => {
@@ -456,11 +546,15 @@ const loadContext = async () => {
         ui.progress({ value: 60, message: 'Processing application state...' })
         const data = await res.json()
         window.oaContext = data
+        pinnedPaths = Array.isArray(data.pinned)
+            ? data.pinned.filter((item) => typeof item === 'string' && /^(\$content|\$specs)\/.*\.json$/i.test(item))
+            : []
         themeUi.init(data.settings)
         ui.init(data.settings)
         currentEnv = data.env || 'prod'
         currentTenant = data.tenant || ''
         currentUser = data.user || ''
+        sessionStatus = String(data.session?.status || '')
         refreshTopbar()
         renderHeaderBreadcrumb()
         refreshTerminalTabLabel()
@@ -527,13 +621,18 @@ const init = async () => {
                 await openConfig()
                 return
             }
-            
+
             if (currentSection === 'help') {
                 await openHelp()
                 return
             }
         })
     }
+
+    statusBar.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-renew-session]')
+        if (button) renewSession(button)
+    })
 
     gitUi.ensureGitPopup()
     terminalUi.render()
@@ -577,6 +676,9 @@ const init = async () => {
     } else if (section === 'help') {
         await openHelp()
         await renderDirectoryNav('', 'help')
+    } else if (section === 'pinned') {
+        await openPinned()
+        await renderDirectoryNav('', 'pinned')
     } else {
         await openOverview()
         await renderDirectoryNav('', 'overview')

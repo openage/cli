@@ -1,7 +1,7 @@
 import { renderExamples } from './templates.js'
 import { copyText, buildAbsoluteUrl, getFileIcon, escapeHtml } from './utils.js'
 
-export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUseCommand, onAddLocalPath }) => {
+export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUseCommand, onAddLocalPath, isPinned, onTogglePin }) => {
     const sectionTemplateCache = new Map()
     let settingsMeta = null
 
@@ -197,25 +197,40 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
         const renderDetails = (entry, metaPayload, diffText = '', fileCount = null) => {
             const commands = getCommandsForEntry(entry)
             const isFile = entry.type === 'file'
+            const isJsonFile = isFile && entry.name.toLowerCase().endsWith('.json')
+            const pinned = isJsonFile && isPinned?.(entry.path)
             const schemaOptions = [...(metaPayload?.schemaOptions || []), ...(metaPayload?.schemaType ? [{ value: metaPayload.schemaType, label: metaPayload.schemaType }] : [])]
                 .filter((item, index, arr) => item?.value && arr.findIndex((other) => other?.value === item.value) === index)
-        const isNavFile = entry.type === 'file' && (entry.path || '').includes('system/navs')
-        const navUrl = metaPayload?.meta?.url || ''
-        const context = window['oaContext'] || {}
-        const webHost = context.web || ''
-        const sessionToken = context.session?.token || ''
-        const webBase = webHost.replace(/\/+$/, '')
-        const navPath = navUrl.replace(/^\/+/, '')
-        const pageUrl = (isNavFile && navUrl && webHost)
-            ? `${webBase.startsWith('http') ? webBase : `https://${webBase}`}/${navPath}?session-token=${sessionToken}`
-            : ''
+            const isNavFile = entry.type === 'file' && (entry.path || '').includes('system/navs')
+            const navUrl = metaPayload?.meta?.url || ''
+            const context = window['oaContext'] || {}
+            const webHost = context.web || ''
+            const sessionToken = context.session?.token || ''
+            const webBase = webHost.replace(/\/+$/, '')
+            const navPath = navUrl.replace(/^\/+/, '')
+            const pageUrl = (isNavFile && navUrl && webHost)
+                ? `${webBase.startsWith('http') ? webBase : `https://${webBase}`}/${navPath}?session-token=${sessionToken}`
+                : ''
 
-        return `
+            return `
               <section class="card meta-card" id="details-card">
                 <section class="details-header">
                   <span class="file-icon">${isFile ? escapeHtml(getFileIcon(entry.name)) : 'DIR'}</span>
                   <strong>${escapeHtml(entry.name || '')}</strong>
                 </section>
+
+                                <section class="details-actions">
+                                    <div class="example-actions">
+                                        <button type="button" class="copy-btn" data-run-command="${escapeHtml(commands.primary)}">${rootKind === 'specs' ? 'Test' : 'Pull'}</button>
+                                        <button type="button" class="copy-btn" data-run-command="${escapeHtml(commands.secondary)}">${rootKind === 'specs' ? 'Validate' : 'Push'}</button>
+                                        ${isFile ? `<button type="button" class="copy-btn" data-run-command="${escapeHtml(`oa test${entry.cwdRelativePath ? ` --local ./${entry.cwdRelativePath}` : ''}`)}">Validate Schema</button>` : ''}
+                                        ${isFile ? `<button type="button" class="copy-btn" data-open-vscode="${escapeHtml(entry.path)}">Open In Editor</button>` : `<button type="button" class="copy-btn" data-open-path="${escapeHtml(entry.path)}">Open Folder</button>`}
+                                        ${isJsonFile ? `<button type="button" class="copy-btn ${pinned ? 'is-pinned' : ''}" data-toggle-pin="${escapeHtml(entry.path)}">${pinned ? 'Unpin' : 'Pin'}</button>` : ''}
+                                        <button type="button" class="copy-btn" data-copy-webpath="${escapeHtml(entry.webPath || '')}">Copy Web URL</button>
+                                        ${pageUrl ? `<a href="${escapeHtml(pageUrl)}" target="_blank" class="copy-btn">View Page</a>` : ''}
+                                    </div>
+                                    <p class="summary" data-meta-feedback></p>
+                                </section>
 
                 <section class="details-body">
                   <form class="meta-form" data-meta-schema-form>
@@ -251,17 +266,6 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                   ` : `<p class="summary">No. of files: ${fileCount ?? 0}</p>`}
                 </section>
 
-                <section class="details-footer">
-                  <div class="example-actions">
-                    <button type="button" class="copy-btn" data-run-command="${escapeHtml(commands.primary)}">${rootKind === 'specs' ? 'Test' : 'Pull'}</button>
-                    <button type="button" class="copy-btn" data-run-command="${escapeHtml(commands.secondary)}">${rootKind === 'specs' ? 'Validate' : 'Push'}</button>
-                    ${isFile ? `<button type="button" class="copy-btn" data-run-command="${escapeHtml(`oa test${entry.cwdRelativePath ? ` --local ./${entry.cwdRelativePath}` : ''}`)}">Validate Schema</button>` : ''}
-                    ${isFile ? `<button type="button" class="copy-btn" data-open-vscode="${escapeHtml(entry.path)}">Open In Editor</button>` : `<button type="button" class="copy-btn" data-open-path="${escapeHtml(entry.path)}">Open Folder</button>`}
-                    <button type="button" class="copy-btn" data-copy-webpath="${escapeHtml(entry.webPath || '')}">Copy Web URL</button>
-                    ${pageUrl ? `<a href="${escapeHtml(pageUrl)}" target="_blank" class="copy-btn">View Page</a>` : ''}
-                  </div>
-                  <p class="summary" data-meta-feedback></p>
-                </section>
               </section>
             `
         }
@@ -269,7 +273,7 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
         mainContent.innerHTML = await renderSectionTemplate(rootKind === 'specs' ? 'specs' : 'data', {
             FOLDER_WEB_PATH: escapeHtml(folderWebPath),
             BROWSE_PATH: escapeHtml(path || ''),
-            DIRECTORY_ROWS: renderRows('') || '<p class="summary">This folder is empty.</p>',
+            DIRECTORY_ROWS: renderRows(metaSupport.selectedPath || '') || '<p class="summary">This folder is empty.</p>',
             DETAILS_CARD: renderDetails(folderSummary, rootMeta || {}, '', folderSummary.fileCount)
         })
 
@@ -377,6 +381,15 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
         }
 
         mainContent.onclick = async (event) => {
+            const togglePin = event.target.closest('[data-toggle-pin]')
+            if (togglePin) {
+                if (!onTogglePin) return
+                const pinned = await onTogglePin(togglePin.dataset.togglePin || '')
+                togglePin.textContent = pinned ? 'Unpin' : 'Pin'
+                togglePin.classList.toggle('is-pinned', pinned)
+                return
+            }
+
             const copyPath = event.target.closest('[data-copy-webpath]')
             if (copyPath) {
                 await copyText(buildAbsoluteUrl(copyPath.dataset.copyWebpath), copyPath)
@@ -447,6 +460,15 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
         }
 
         bindDetailForms(folderSummary, rootMeta || {})
+        const selectedEntry = metaSupport.selectedPath
+            ? entries.find((entry) => {
+                const entryPath = path ? `${path}/${entry.name}` : entry.name
+                return entryPath === metaSupport.selectedPath
+            })
+            : null
+        if (selectedEntry) {
+            await selectEntry({ ...selectedEntry, path: metaSupport.selectedPath })
+        }
     }
 
     const flattenConfig = (obj, prefix = '') => {
@@ -510,7 +532,7 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                 const meta = metaMap[item.key] || {}
                 const type = meta.type || 'string'
                 const displayName = meta.label || item.key
-                
+
                 let displayValue = valueString
                 if (type === 'options' && meta.options) {
                     const choice = meta.options.find((c) => String(c.value) === String(item.value))
@@ -772,7 +794,7 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
             footer.style.marginTop = '1rem'
             footer.style.borderTop = '1px solid var(--border-color)'
             footer.style.paddingTop = '1rem'
-            
+
             const actionDiv = document.createElement('div')
             actionDiv.className = 'example-actions'
 
