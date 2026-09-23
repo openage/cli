@@ -1,68 +1,173 @@
 export const themes = {
-    'one-dark-pro': {
-        'light': {
-            '--bg': '#fafafa',
-            '--bg-elevated': '#f0f0f0',
-            '--surface': '#e5e5e5',
-            '--surface-soft': '#ffffff',
-            '--text': '#383a42',
-            '--text-muted': '#696c77',
-            '--primary': '#4078f2',
-            '--border': '#d0d0d0'
+    'ms-fabric': {
+        name: 'MS Fabric',
+        desc: 'Microsoft Fluent & Fabric design',
+        light: {
+            '--bg': '#f3f2f1',
+            '--bg-elevated': '#ffffff',
+            '--surface': '#ffffff',
+            '--surface-soft': '#f8f8f7',
+            '--surface-strong': '#edebe9',
+            '--text': '#201f1e',
+            '--text-muted': '#605e5c',
+            '--text-subtle': '#a19f9d',
+            '--border': '#edebe9',
+            '--border-strong': '#d2d0ce',
+            '--primary': '#0078d4',
+            '--primary-strong': '#106ebe',
+            '--primary-soft': 'rgba(0, 120, 212, 0.14)',
+            '--shadow-sm': '0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04)',
+            '--shadow-md': '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04)',
+            '--shadow-lg': '0 12px 28px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.06)'
         },
-        'dark': {
-            '--bg': '#282c34',
-            '--bg-elevated': '#21252b',
-            '--surface': '#181a1f',
-            '--surface-soft': '#2c313a',
-            '--text': '#abb2bf',
-            '--text-muted': '#5c6370',
-            '--primary': '#61afef',
-            '--border': '#181a1f'
+        dark: {
+            '--bg': '#201f1e',
+            '--bg-elevated': '#292827',
+            '--surface': '#252423',
+            '--surface-soft': '#2d2c2b',
+            '--surface-strong': '#373533',
+            '--text': '#f3f2f1',
+            '--text-muted': '#c8c6c4',
+            '--text-subtle': '#979593',
+            '--border': '#3b3a39',
+            '--border-strong': '#484644',
+            '--primary': '#2886de',
+            '--primary-strong': '#4894e4',
+            '--primary-soft': 'rgba(40, 134, 222, 0.18)',
+            '--shadow-sm': '0 2px 8px rgba(0, 0, 0, 0.4)',
+            '--shadow-md': '0 8px 24px rgba(0, 0, 0, 0.5)',
+            '--shadow-lg': '0 16px 40px rgba(0, 0, 0, 0.65)'
         }
     },
     'github': {
-        'light': {
+        name: 'GitHub',
+        desc: 'Primer clean engineering style',
+        light: {
             '--bg': '#ffffff',
             '--bg-elevated': '#f6f8fa',
-            '--surface': '#ebeff2',
-            '--surface-soft': '#ffffff',
-            '--text': '#24292f',
-            '--text-muted': '#57606a',
+            '--surface': '#ffffff',
+            '--surface-soft': '#f6f8fa',
+            '--surface-strong': '#eaeef2',
+            '--text': '#1f2328',
+            '--text-muted': '#656d76',
+            '--text-subtle': '#8c959f',
+            '--border': '#d0d7de',
+            '--border-strong': '#afb8c1',
             '--primary': '#0969da',
-            '--border': '#d0d7de'
+            '--primary-strong': '#0550ae',
+            '--primary-soft': 'rgba(9, 105, 218, 0.12)',
+            '--shadow-sm': '0 1px 3px rgba(31, 35, 40, 0.08), 0 1px 2px rgba(31, 35, 40, 0.04)',
+            '--shadow-md': '0 4px 14px rgba(140, 149, 159, 0.18), 0 2px 4px rgba(140, 149, 159, 0.08)',
+            '--shadow-lg': '0 12px 28px rgba(140, 149, 159, 0.24), 0 4px 8px rgba(140, 149, 159, 0.12)'
         },
-        'dark': {
+        dark: {
             '--bg': '#0d1117',
             '--bg-elevated': '#161b22',
-            '--surface': '#010409',
-            '--surface-soft': '#161b22',
-            '--text': '#c9d1d9',
-            '--text-muted': '#8b949e',
-            '--primary': '#58a6ff',
-            '--border': '#30363d'
+            '--surface': '#161b22',
+            '--surface-soft': '#21262d',
+            '--surface-strong': '#30363d',
+            '--text': '#e6edf3',
+            '--text-muted': '#848d97',
+            '--text-subtle': '#656d76',
+            '--border': '#30363d',
+            '--border-strong': '#424a53',
+            '--primary': '#2f81f7',
+            '--primary-strong': '#58a6ff',
+            '--primary-soft': 'rgba(47, 129, 247, 0.16)',
+            '--shadow-sm': '0 2px 8px rgba(1, 4, 9, 0.45)',
+            '--shadow-md': '0 8px 24px rgba(1, 4, 9, 0.55)',
+            '--shadow-lg': '0 16px 40px rgba(1, 4, 9, 0.7)'
         }
     },
-    'night-owl': {
-        'light': {
-            '--bg': '#fdfffe',
-            '--bg-elevated': '#f0f0f0',
-            '--surface': '#ebeff2',
-            '--surface-soft': '#ffffff',
-            '--text': '#403f53',
-            '--text-muted': '#909090',
-            '--primary': '#2a76a8',
-            '--border': '#d9d9d9'
+    'monokai': {
+        name: 'Monokai',
+        desc: 'Classic vibrant code contrast',
+        light: {
+            '--bg': '#faf8f5',
+            '--bg-elevated': '#f0ede6',
+            '--surface': '#ffffff',
+            '--surface-soft': '#f2eee5',
+            '--surface-strong': '#e5ded0',
+            '--text': '#2c292d',
+            '--text-muted': '#696465',
+            '--text-subtle': '#938f90',
+            '--border': '#ddd6c7',
+            '--border-strong': '#c4bcab',
+            '--primary': '#709a06',
+            '--primary-strong': '#587e02',
+            '--primary-soft': 'rgba(112, 154, 6, 0.14)',
+            '--shadow-sm': '0 2px 8px rgba(44, 41, 45, 0.06)',
+            '--shadow-md': '0 8px 20px rgba(44, 41, 45, 0.1)',
+            '--shadow-lg': '0 16px 36px rgba(44, 41, 45, 0.14)'
         },
-        'dark': {
-            '--bg': '#011627',
-            '--bg-elevated': '#0b2942',
-            '--surface': '#010e1a',
-            '--surface-soft': '#0b2942',
-            '--text': '#d6deeb',
-            '--text-muted': '#5f7e97',
-            '--primary': '#82aaff',
-            '--border': '#1d3b53'
+        dark: {
+            '--bg': '#272822',
+            '--bg-elevated': '#1e1f1c',
+            '--surface': '#2d2a2e',
+            '--surface-soft': '#3e3d32',
+            '--surface-strong': '#49483e',
+            '--text': '#f8f8f2',
+            '--text-muted': '#cfcfc2',
+            '--text-subtle': '#75715e',
+            '--border': '#3e3d32',
+            '--border-strong': '#575647',
+            '--primary': '#a6e22e',
+            '--primary-strong': '#bcf246',
+            '--primary-soft': 'rgba(166, 226, 46, 0.18)',
+            '--shadow-sm': '0 4px 16px rgba(10, 10, 8, 0.55)',
+            '--shadow-md': '0 14px 28px rgba(10, 10, 8, 0.65)',
+            '--shadow-lg': '0 20px 44px rgba(10, 10, 8, 0.75)'
+        }
+    },
+    'one-dark-pro': {
+        name: 'One Dark Pro',
+        desc: 'Atom balanced developer theme',
+        light: {
+            '--bg': '#fafafa',
+            '--bg-elevated': '#f0f0f0',
+            '--surface': '#ffffff',
+            '--surface-soft': '#f4f4f4',
+            '--surface-strong': '#e5e5e5',
+            '--text': '#383a42',
+            '--text-muted': '#696c77',
+            '--text-subtle': '#a0a1a7',
+            '--border': '#e0e0e0',
+            '--border-strong': '#c0c0c0',
+            '--primary': '#4078f2',
+            '--primary-strong': '#2c65e0',
+            '--primary-soft': 'rgba(64, 120, 242, 0.14)',
+            '--shadow-sm': '0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04)',
+            '--shadow-md': '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04)',
+            '--shadow-lg': '0 12px 28px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.06)'
+        },
+        dark: {
+            '--bg': '#282c34',
+            '--bg-elevated': '#21252b',
+            '--surface': '#1e2227',
+            '--surface-soft': '#2c313a',
+            '--surface-strong': '#3e4451',
+            '--text': '#abb2bf',
+            '--text-muted': '#7f848e',
+            '--text-subtle': '#5c6370',
+            '--border': '#353b45',
+            '--border-strong': '#4b5263',
+            '--primary': '#61afef',
+            '--primary-strong': '#4fa6ed',
+            '--primary-soft': 'rgba(97, 175, 239, 0.16)',
+            '--shadow-sm': '0 2px 8px rgba(2, 6, 16, 0.45)',
+            '--shadow-md': '0 8px 24px rgba(2, 6, 16, 0.55)',
+            '--shadow-lg': '0 16px 40px rgba(2, 6, 16, 0.65)'
         }
     }
 }
+
+export const themeColors = [
+    { code: 'default', name: 'Theme Default', hex: 'var(--theme-default-color)' },
+    { code: 'teal', name: 'Cyan Teal', hex: '#16dbc5', strong: '#11c7b4', soft: 'rgba(22, 219, 197, 0.18)' },
+    { code: 'blue', name: 'Electric Blue', hex: '#0078d4', strong: '#106ebe', soft: 'rgba(0, 120, 212, 0.18)' },
+    { code: 'green', name: 'Emerald', hex: '#107c41', strong: '#0b6a37', soft: 'rgba(16, 124, 65, 0.18)' },
+    { code: 'lime', name: 'Monokai Lime', hex: '#a6e22e', strong: '#8ec91a', soft: 'rgba(166, 226, 46, 0.18)' },
+    { code: 'purple', name: 'Royal Purple', hex: '#8854d0', strong: '#783cbd', soft: 'rgba(136, 84, 208, 0.18)' },
+    { code: 'orange', name: 'Sunset Orange', hex: '#fa8231', strong: '#eb6f1c', soft: 'rgba(250, 130, 49, 0.18)' },
+    { code: 'pink', name: 'Neon Pink', hex: '#f368e0', strong: '#e04ecb', soft: 'rgba(243, 104, 224, 0.18)' }
+]

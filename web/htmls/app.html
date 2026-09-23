@@ -42,6 +42,28 @@
                         <span class="workspace-dot" aria-hidden="true"></span>
                         <span id="workspace-label">Workspace</span>
                     </span>
+                    <button id="theme-mode-btn" type="button" class="topbar-icon-btn theme-mode-btn" title="Toggle Light / Dark Mode" aria-label="Toggle Light / Dark Mode">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="5"></circle>
+                            <line x1="12" y1="1" x2="12" y2="3"></line>
+                            <line x1="12" y1="21" x2="12" y2="23"></line>
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                            <line x1="1" y1="12" x2="3" y2="12"></line>
+                            <line x1="21" y1="12" x2="23" y2="12"></line>
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                        </svg>
+                    </button>
+                    <button id="theme-picker-btn" type="button" class="topbar-icon-btn theme-picker-btn" title="Themes & Color Options" aria-label="Themes & Color Options">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="13.5" cy="6.5" r=".5" fill="currentColor"></circle>
+                            <circle cx="17.5" cy="10.5" r=".5" fill="currentColor"></circle>
+                            <circle cx="8.5" cy="7.5" r=".5" fill="currentColor"></circle>
+                            <circle cx="6.5" cy="12.5" r=".5" fill="currentColor"></circle>
+                            <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"></path>
+                        </svg>
+                    </button>
                     <button id="user-avatar" type="button" class="avatar-btn" title="Current user">OA</button>
                 </div>
             </header>
@@ -51,6 +73,121 @@
             <div id="terminal-host"></div>
         </aside>
         <button id="terminal-toggle-tab" class="terminal-toggle-tab" type="button" title="Toggle terminal"></button>
+    </div>
+
+    <!-- Theme Settings Panel -->
+    <div id="theme-panel" class="theme-panel hidden" role="dialog" aria-label="Theme Customization">
+        <div class="theme-panel-header">
+            <div class="theme-panel-title">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/>
+                    <circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/>
+                    <circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/>
+                    <circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/>
+                    <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>
+                </svg>
+                <span>Theme & Appearance</span>
+            </div>
+            <button id="theme-panel-close" type="button" class="theme-panel-close-btn" aria-label="Close theme panel">&times;</button>
+        </div>
+
+        <div class="theme-panel-body">
+            <!-- Mode Selection -->
+            <div class="theme-panel-group">
+                <span class="theme-group-label">Color Mode</span>
+                <div class="theme-mode-tabs" role="tablist">
+                    <button type="button" class="theme-mode-tab" data-mode="light" role="tab">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="4"/>
+                            <path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+                        </svg>
+                        <span>Light</span>
+                    </button>
+                    <button type="button" class="theme-mode-tab active" data-mode="dark" role="tab">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                        </svg>
+                        <span>Dark</span>
+                    </button>
+                    <button type="button" class="theme-mode-tab" data-mode="system" role="tab">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="3" width="20" height="14" rx="2"/>
+                            <line x1="8" y1="21" x2="16" y2="21"/>
+                            <line x1="12" y1="17" x2="12" y2="21"/>
+                        </svg>
+                        <span>Auto</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Theme Presets -->
+            <div class="theme-panel-group">
+                <span class="theme-group-label">Theme Preset</span>
+                <div class="theme-presets-list">
+                    <!-- MS Fabric -->
+                    <button type="button" class="theme-preset-card" data-theme="ms-fabric">
+                        <div class="theme-preset-header">
+                            <span class="theme-preset-name">MS Fabric</span>
+                            <span class="theme-preset-badge">Fluent</span>
+                        </div>
+                        <div class="theme-preset-preview">
+                            <span class="preview-chip" style="background: #0078d4;"></span>
+                            <span class="preview-chip" style="background: #201f1e;"></span>
+                            <span class="preview-chip" style="background: #f3f2f1;"></span>
+                        </div>
+                        <p class="theme-preset-desc">Microsoft Fluent & Fabric design</p>
+                    </button>
+
+                    <!-- GitHub -->
+                    <button type="button" class="theme-preset-card" data-theme="github">
+                        <div class="theme-preset-header">
+                            <span class="theme-preset-name">GitHub</span>
+                            <span class="theme-preset-badge">Primer</span>
+                        </div>
+                        <div class="theme-preset-preview">
+                            <span class="preview-chip" style="background: #0969da;"></span>
+                            <span class="preview-chip" style="background: #0d1117;"></span>
+                            <span class="preview-chip" style="background: #ffffff;"></span>
+                        </div>
+                        <p class="theme-preset-desc">Clean engineering & GitHub Primer</p>
+                    </button>
+
+                    <!-- Monokai -->
+                    <button type="button" class="theme-preset-card" data-theme="monokai">
+                        <div class="theme-preset-header">
+                            <span class="theme-preset-name">Monokai</span>
+                            <span class="theme-preset-badge">Pro</span>
+                        </div>
+                        <div class="theme-preset-preview">
+                            <span class="preview-chip" style="background: #a6e22e;"></span>
+                            <span class="preview-chip" style="background: #f92672;"></span>
+                            <span class="preview-chip" style="background: #272822;"></span>
+                        </div>
+                        <p class="theme-preset-desc">Classic vibrant code contrast</p>
+                    </button>
+
+                    <!-- One Dark Pro -->
+                    <button type="button" class="theme-preset-card" data-theme="one-dark-pro">
+                        <div class="theme-preset-header">
+                            <span class="theme-preset-name">One Dark Pro</span>
+                            <span class="theme-preset-badge">Atom</span>
+                        </div>
+                        <div class="theme-preset-preview">
+                            <span class="preview-chip" style="background: #61afef;"></span>
+                            <span class="preview-chip" style="background: #e06c75;"></span>
+                            <span class="preview-chip" style="background: #282c34;"></span>
+                        </div>
+                        <p class="theme-preset-desc">Balanced developer theme</p>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Color Options -->
+            <div class="theme-panel-group">
+                <span class="theme-group-label">Accent Color Options</span>
+                <div id="theme-colors-palette" class="theme-colors-palette"></div>
+            </div>
+        </div>
     </div>
     <script type="module" src="../app.js"></script>
 </body>
