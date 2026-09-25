@@ -1,6 +1,6 @@
 {
   "name": "@open-age/cli",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "displayName": "OA CLI",
   "description": "Command line client to connect to open-age backend",
   "publisher": "sunny-parkash",

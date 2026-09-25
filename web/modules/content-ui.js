@@ -84,9 +84,19 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
         }).join('')
     }
 
-    const renderHome = async () => {
+    const renderHome = async (contextData = {}, gitSummary = {}) => {
+        const session = contextData.session || {}
+        const homeStatus = `
+                    <section class="home-status" aria-label="Current status">
+                        <div><span>Session</span><strong>${escapeHtml(session.status || 'Unknown')}</strong><small>${escapeHtml(session.remainingMs != null ? `${Math.max(0, Math.floor(session.remainingMs / 1000))}s remaining` : 'Remaining time unavailable')}</small></div>
+                        <div><span>Workspace</span><strong>${escapeHtml(contextData.tenant || 'No tenant')}</strong><small>${escapeHtml(String(contextData.env || 'prod').toUpperCase())} environment</small></div>
+                        <div><span>Current User</span><strong>${escapeHtml(contextData.user || 'Not signed in')}</strong><small>${escapeHtml(contextData.role || 'No role')}</small></div>
+                        <div><span>Git</span><strong>${escapeHtml(gitSummary.branch || 'Unavailable')}</strong><small>${escapeHtml(`${gitSummary.totalChanged ?? 0} changed, ${gitSummary.stagedCount ?? 0} staged`)}</small></div>
+                    </section>
+                `
         mainContent.innerHTML = await renderSectionTemplate('overview', {
-            COMMAND_CARDS: buildCommandCards()
+            COMMAND_CARDS: buildCommandCards(),
+            HOME_STATUS: homeStatus
         })
 
         mainContent.onclick = async (event) => {
@@ -194,7 +204,7 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
             ? metaSupport.payload
             : (isMetaEnabled && metaSupport.loadMeta ? await metaSupport.loadMeta(path || (rootKind === 'specs' ? '$specs' : '$content')) : null)
 
-        const renderDetails = (entry, metaPayload, diffText = '', fileCount = null) => {
+        const renderDetails = (entry, metaPayload, diffText = '', fileCount = null, fileContent = '') => {
             const commands = getCommandsForEntry(entry)
             const isFile = entry.type === 'file'
             const isJsonFile = isFile && entry.name.toLowerCase().endsWith('.json')
@@ -212,62 +222,88 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                 ? `${webBase.startsWith('http') ? webBase : `https://${webBase}`}/${navPath}?session-token=${sessionToken}`
                 : ''
 
-            return `
-              <section class="card meta-card" id="details-card">
-                <section class="details-header">
-                  <span class="file-icon">${isFile ? escapeHtml(getFileIcon(entry.name)) : 'DIR'}</span>
-                  <strong>${escapeHtml(entry.name || '')}</strong>
-                </section>
-
-                                <section class="details-actions">
-                                    <div class="example-actions">
-                                        <button type="button" class="copy-btn" data-run-command="${escapeHtml(commands.primary)}">${rootKind === 'specs' ? 'Test' : 'Pull'}</button>
-                                        <button type="button" class="copy-btn" data-run-command="${escapeHtml(commands.secondary)}">${rootKind === 'specs' ? 'Validate' : 'Push'}</button>
-                                        ${isFile ? `<button type="button" class="copy-btn" data-run-command="${escapeHtml(`oa test${entry.cwdRelativePath ? ` --local ./${entry.cwdRelativePath}` : ''}`)}">Validate Schema</button>` : ''}
-                                        ${isFile ? `<button type="button" class="copy-btn" data-open-vscode="${escapeHtml(entry.path)}">Open In Editor</button>` : `<button type="button" class="copy-btn" data-open-path="${escapeHtml(entry.path)}">Open Folder</button>`}
-                                        ${isJsonFile ? `<button type="button" class="copy-btn ${pinned ? 'is-pinned' : ''}" data-toggle-pin="${escapeHtml(entry.path)}">${pinned ? 'Unpin' : 'Pin'}</button>` : ''}
-                                        <button type="button" class="copy-btn" data-copy-webpath="${escapeHtml(entry.webPath || '')}">Copy Web URL</button>
-                                        ${pageUrl ? `<a href="${escapeHtml(pageUrl)}" target="_blank" class="copy-btn">View Page</a>` : ''}
-                                    </div>
-                                    <p class="summary" data-meta-feedback></p>
-                                </section>
-
-                <section class="details-body">
-                  <form class="meta-form" data-meta-schema-form>
-                    <select class="terminal-input" name="schemaType">
-                      <option value="">(none)</option>
-                      ${schemaOptions.map((item) => `<option value="${escapeHtml(item.value)}" ${item.value === metaPayload?.schemaType ? 'selected' : ''}>${escapeHtml(item.label || item.value)}</option>`).join('')}
-                    </select>
-                    <button class="terminal-run" type="submit">Save Schema Type</button>
-                  </form>
-                  <form class="meta-form" data-meta-file-form>
-                    <label class="summary">Meta File</label>
-                    <select class="terminal-input" name="metaFile">
-                      ${[...(metaPayload?.availableMetaFiles || []), metaPayload?.selectedMetaFile || 'meta.json']
+            const hasChanges = isFile && (Boolean(diffText.trim()) || entry.gitStatus !== 'clean')
+            const actionBar = `
+                            <div class="file-context-bar">
+                                <button type="button" class="copy-btn" data-run-command="${escapeHtml(commands.primary)}">${rootKind === 'specs' ? 'Test' : 'Pull'}</button>
+                                <button type="button" class="copy-btn" data-run-command="${escapeHtml(commands.secondary)}">${rootKind === 'specs' ? 'Validate' : 'Push'}</button>
+                                ${isFile ? `<button type="button" class="copy-btn" data-run-command="${escapeHtml(`oa test${entry.cwdRelativePath ? ` --local ./${entry.cwdRelativePath}` : ''}`)}">Validate Schema</button>` : ''}
+                                ${isFile ? `<button type="button" class="copy-btn" data-open-vscode="${escapeHtml(entry.path)}">Open In Editor</button>` : `<button type="button" class="copy-btn" data-open-path="${escapeHtml(entry.path)}">Open Folder</button>`}
+                                ${isJsonFile ? `<button type="button" class="copy-btn ${pinned ? 'is-pinned' : ''}" data-toggle-pin="${escapeHtml(entry.path)}">${pinned ? 'Unpin' : 'Pin'}</button>` : ''}
+                                <button type="button" class="copy-btn" data-copy-webpath="${escapeHtml(entry.webPath || '')}">Copy Web URL</button>
+                                ${pageUrl ? `<a href="${escapeHtml(pageUrl)}" target="_blank" class="copy-btn">View Page</a>` : ''}
+                            </div>
+                        `
+            const remotePanel = `
+                            <section class="detail-section">
+                                <h3>Remote</h3>
+                                <form class="meta-form" data-meta-file-form>
+                                    <select class="terminal-input" name="metaFile" aria-label="Remote metadata file">
+                                        ${[...(metaPayload?.availableMetaFiles || []), metaPayload?.selectedMetaFile || 'meta.json']
                     .filter((v, i, a) => v && a.indexOf(v) === i)
                     .sort((a, b) => a.localeCompare(b))
                     .map((name) => `<option value="${escapeHtml(name)}" ${name === metaPayload?.selectedMetaFile ? 'selected' : ''}>${escapeHtml(name)}</option>`).join('')}
-                    </select>
-                    <button class="copy-btn" type="submit">Load</button>
-                  </form>
-                  <form class="meta-form meta-form-stack" data-meta-json-form>
-                    <textarea class="meta-json" name="metaJson" spellcheck="false">${escapeHtml(JSON.stringify(metaPayload?.meta || {}, null, 2))}</textarea>
-                    <button class="terminal-run" type="submit">Save Meta JSON</button>
-                  </form>
-                  <details>
-                    <summary>Schema</summary>
-                    <pre class="terminal-output config-output">${escapeHtml(JSON.stringify(metaPayload?.schema || {}, null, 2))}</pre>
-                  </details>
-                  ${isFile ? `
-                    <details open>
-                      <summary>Git Diff</summary>
-                      <pre class="terminal-output config-output">${escapeHtml(diffText || '(No diff)')}</pre>
-                    </details>
-                  ` : `<p class="summary">No. of files: ${fileCount ?? 0}</p>`}
-                </section>
+                                    </select>
+                                    <button class="copy-btn" type="submit">Load</button>
+                                </form>
+                                <form class="meta-form meta-form-stack" data-meta-json-form>
+                                    <textarea class="meta-json" name="metaJson" spellcheck="false" aria-label="Remote metadata JSON">${escapeHtml(JSON.stringify(metaPayload?.meta || {}, null, 2))}</textarea>
+                                    <button class="terminal-run" type="submit">Save Remote Metadata</button>
+                                </form>
+                            </section>
+                        `
+            const schemaPanel = `
+                            <section class="detail-section">
+                                <h3>Schema</h3>
+                                <form class="meta-form" data-meta-schema-form>
+                                    <select class="terminal-input" name="schemaType" aria-label="Schema type">
+                                        <option value="">(none)</option>
+                                        ${schemaOptions.map((item) => `<option value="${escapeHtml(item.value)}" ${item.value === metaPayload?.schemaType ? 'selected' : ''}>${escapeHtml(item.label || item.value)}</option>`).join('')}
+                                    </select>
+                                    <button class="terminal-run" type="submit">Save</button>
+                                </form>
+                                <pre class="terminal-output config-output schema-preview">${escapeHtml(JSON.stringify(metaPayload?.schema || {}, null, 2))}</pre>
+                            </section>
+                        `
+            const changesPanel = hasChanges ? `
+                            <section class="detail-section changes-section">
+                                <h3>Uncommitted Changes</h3>
+                                <pre class="terminal-output config-output">${escapeHtml(diffText || '(Untracked file; current contents will be committed.)')}</pre>
+                                <form class="file-commit-form" data-commit-file-form>
+                                    <input class="terminal-input" name="commitMessage" type="text" placeholder="Commit message" aria-label="Commit message" required />
+                                    <button class="terminal-run" type="submit">Commit This File</button>
+                                </form>
+                            </section>
+                        ` : ''
 
-              </section>
-            `
+            return `
+                            <section class="file-detail-view" id="details-card">
+                                <header class="file-detail-title">
+                                    <div class="file-detail-heading">
+                                        <span class="file-icon">${isFile ? escapeHtml(getFileIcon(entry.name)) : 'DIR'}</span>
+                                        <div><h2>${escapeHtml(entry.name || '')}</h2><p>${escapeHtml(entry.path || '')}</p></div>
+                                    </div>
+                                    <button type="button" class="icon-button detail-back" data-details-back title="Back to parent folder" aria-label="Back to parent folder">&times;</button>
+                                </header>
+                                <div class="file-detail-columns">
+                                    <main class="file-detail-main">
+                                        ${actionBar}
+                                        <p class="detail-feedback" data-meta-feedback aria-live="polite"></p>
+                                        ${isFile ? `
+                                            <form class="file-content-editor" data-file-content-form>
+                                                <textarea class="meta-json" name="fileContent" spellcheck="false" aria-label="File contents">${escapeHtml(fileContent || '')}</textarea>
+                                                <button class="terminal-run" type="submit">Save File</button>
+                                            </form>
+                                        ` : `<section class="folder-summary"><h3>Folder</h3><p>${fileCount ?? 0} files in this folder</p></section>`}
+                                    </main>
+                                    <aside class="file-detail-sidebar">
+                                        ${remotePanel}
+                                        ${schemaPanel}
+                                        ${changesPanel}
+                                    </aside>
+                                </div>
+                            </section>
+                        `
         }
 
         mainContent.innerHTML = await renderSectionTemplate(rootKind === 'specs' ? 'specs' : 'data', {
@@ -279,6 +315,7 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
 
         const directoryPane = mainContent.querySelector('#directory-list-pane')
         const detailsPane = mainContent.querySelector('#details-pane')
+        const directorySplit = mainContent.querySelector('.directory-split')
 
         const openInEditor = async (targetPath) => {
             const res = await fetch('/api/open-vscode', {
@@ -292,11 +329,31 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
             }
         }
 
+        let activeEntry = folderSummary
         const bindDetailForms = (entry, metaPayload) => {
             const feedbackEl = detailsPane.querySelector('[data-meta-feedback]')
             const metaFileForm = detailsPane.querySelector('[data-meta-file-form]')
             const schemaForm = detailsPane.querySelector('[data-meta-schema-form]')
             const metaJsonForm = detailsPane.querySelector('[data-meta-json-form]')
+            const fileContentForm = detailsPane.querySelector('[data-file-content-form]')
+            const commitFileForm = detailsPane.querySelector('[data-commit-file-form]')
+
+            commitFileForm?.addEventListener('submit', async (event) => {
+                event.preventDefault()
+                if (!metaSupport.commitFile) return
+                const formData = new FormData(commitFileForm)
+                const message = String(formData.get('commitMessage') || '').trim()
+                if (!message) return
+                if (feedbackEl) feedbackEl.textContent = 'Committing this file...'
+                const result = await metaSupport.commitFile({ path: entry.path, message })
+                if (!result?.ok) {
+                    if (feedbackEl) feedbackEl.textContent = result?.stderr || 'Unable to commit this file.'
+                    return
+                }
+                if (metaSupport.refreshDirectory) {
+                    await metaSupport.refreshDirectory(entry.path)
+                }
+            })
 
             metaFileForm?.addEventListener('submit', async (event) => {
                 event.preventDefault()
@@ -305,10 +362,11 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                 const selected = String(formData.get('metaFile') || '')
                 const nextMeta = await metaSupport.loadMeta(entry.path, selected)
                 const diffRes = entry.type === 'file' && metaSupport.loadGitDiff ? await metaSupport.loadGitDiff(entry.path) : { diff: '' }
+                const currentFile = entry.type === 'file' && metaSupport.loadFileContent ? await metaSupport.loadFileContent(entry.path) : { ok: true, content: '' }
                 const fileCount = entry.type === 'directory'
                     ? (entry.path === path ? folderSummary.fileCount : ((await metaSupport.loadEntries?.(entry.path)) || []).filter((item) => item.type === 'file').length)
                     : null
-                detailsPane.innerHTML = renderDetails(entry, nextMeta, diffRes.diff || '', fileCount)
+                detailsPane.innerHTML = renderDetails(entry, nextMeta, diffRes.diff || '', fileCount, currentFile?.content || '')
                 bindDetailForms(entry, nextMeta)
             })
 
@@ -325,10 +383,11 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                 })
                 const nextMeta = saved?.ok ? saved : await metaSupport.loadMeta(entry.path, metaPayload?.selectedMetaFile || '')
                 const diffRes = entry.type === 'file' && metaSupport.loadGitDiff ? await metaSupport.loadGitDiff(entry.path) : { diff: '' }
+                const currentFile = entry.type === 'file' && metaSupport.loadFileContent ? await metaSupport.loadFileContent(entry.path) : { ok: true, content: '' }
                 const fileCount = entry.type === 'directory'
                     ? (entry.path === path ? folderSummary.fileCount : ((await metaSupport.loadEntries?.(entry.path)) || []).filter((item) => item.type === 'file').length)
                     : null
-                detailsPane.innerHTML = renderDetails(entry, nextMeta, diffRes.diff || '', fileCount)
+                detailsPane.innerHTML = renderDetails(entry, nextMeta, diffRes.diff || '', fileCount, currentFile?.content || '')
                 bindDetailForms(entry, nextMeta)
             })
 
@@ -352,15 +411,40 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                 })
                 const nextMeta = saved?.ok ? saved : await metaSupport.loadMeta(entry.path, metaPayload?.selectedMetaFile || '')
                 const diffRes = entry.type === 'file' && metaSupport.loadGitDiff ? await metaSupport.loadGitDiff(entry.path) : { diff: '' }
+                const currentFile = entry.type === 'file' && metaSupport.loadFileContent ? await metaSupport.loadFileContent(entry.path) : { ok: true, content: '' }
                 const fileCount = entry.type === 'directory'
                     ? (entry.path === path ? folderSummary.fileCount : ((await metaSupport.loadEntries?.(entry.path)) || []).filter((item) => item.type === 'file').length)
                     : null
-                detailsPane.innerHTML = renderDetails(entry, nextMeta, diffRes.diff || '', fileCount)
+                detailsPane.innerHTML = renderDetails(entry, nextMeta, diffRes.diff || '', fileCount, currentFile?.content || '')
                 bindDetailForms(entry, nextMeta)
+            })
+
+            fileContentForm?.addEventListener('submit', async (event) => {
+                event.preventDefault()
+                if (entry.type !== 'file' || !metaSupport.saveFileContent) return
+                const formData = new FormData(fileContentForm)
+                const nextContent = String(formData.get('fileContent') ?? '')
+                if (feedbackEl) feedbackEl.textContent = 'Saving file...'
+                const saved = await metaSupport.saveFileContent({ path: entry.path, content: nextContent })
+                if (!saved?.ok) {
+                    if (feedbackEl) feedbackEl.textContent = saved?.error || 'Unable to save file.'
+                    return
+                }
+                const nextMeta = metaSupport.loadMeta ? await metaSupport.loadMeta(entry.path) : metaPayload
+                const diffRes = entry.type === 'file' && metaSupport.loadGitDiff ? await metaSupport.loadGitDiff(entry.path) : { diff: '' }
+                const currentFile = entry.type === 'file' && metaSupport.loadFileContent ? await metaSupport.loadFileContent(entry.path) : { ok: true, content: nextContent }
+                const fileCount = entry.type === 'directory'
+                    ? (entry.path === path ? folderSummary.fileCount : ((await metaSupport.loadEntries?.(entry.path)) || []).filter((item) => item.type === 'file').length)
+                    : null
+                if (feedbackEl) feedbackEl.textContent = 'File saved.'
+                detailsPane.innerHTML = renderDetails(entry, nextMeta || {}, diffRes.diff || '', fileCount, currentFile?.content || '')
+                bindDetailForms(entry, nextMeta || {})
             })
         }
 
         const selectEntry = async (entry) => {
+            activeEntry = entry
+            directorySplit?.classList.toggle('file-selected', entry.type === 'file')
             const selectedRows = mainContent.querySelectorAll('.dir-row.is-selected')
             selectedRows.forEach((node) => node.classList.remove('is-selected'))
             const selectedRow = mainContent.querySelector(`.dir-row[data-select-path="${CSS.escape(entry.path)}"]`)
@@ -372,15 +456,29 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
             const diffRes = entry.type === 'file' && metaSupport.loadGitDiff
                 ? await metaSupport.loadGitDiff(entry.path)
                 : { diff: '' }
+            const fileContent = entry.type === 'file' && metaSupport.loadFileContent
+                ? await metaSupport.loadFileContent(entry.path)
+                : { ok: true, content: '' }
             const fileCount = entry.type === 'directory'
                 ? (entry.path === path ? folderSummary.fileCount : ((await metaSupport.loadEntries?.(entry.path)) || []).filter((item) => item.type === 'file').length)
                 : null
 
-            detailsPane.innerHTML = renderDetails(entry, metaPayload || {}, diffRes.diff || '', fileCount)
+            detailsPane.innerHTML = renderDetails(entry, metaPayload || {}, diffRes.diff || '', fileCount, fileContent?.content || '')
             bindDetailForms(entry, metaPayload || {})
         }
 
         mainContent.onclick = async (event) => {
+            const back = event.target.closest('[data-details-back]')
+            if (back) {
+                const pathToClose = activeEntry.path || ''
+                const parentPath = pathToClose.includes('/') ? pathToClose.slice(0, pathToClose.lastIndexOf('/')) : ''
+                await onOpenCrumb(parentPath)
+                return
+            }
+
+            const fileLink = event.target.closest('.file-link')
+            if (fileLink) event.preventDefault()
+
             const togglePin = event.target.closest('[data-toggle-pin]')
             if (togglePin) {
                 if (!onTogglePin) return
@@ -559,7 +657,7 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
             }).join('')
 
             return `
-              <section class="card config-group-card">
+              <section class="card config-group-card" id="config-section-${escapeHtml(root)}">
                 <h3>${escapeHtml(root.toUpperCase())}</h3>
                 ${description ? `<p class="summary">${escapeHtml(description)}</p>` : ''}
                 <div class="config-list">
@@ -773,6 +871,53 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
         mainContent.onclick = null
     }
 
+    const renderChangelog = (markdown) => {
+        const inline = (text) => escapeHtml(text)
+            .replace(/`([^`]+)`/g, '<code>$1</code>')
+            .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+        const blocks = []
+        let paragraph = []
+        let listItems = []
+
+        const flushParagraph = () => {
+            if (!paragraph.length) return
+            blocks.push(`<p>${inline(paragraph.join(' '))}</p>`)
+            paragraph = []
+        }
+        const flushList = () => {
+            if (!listItems.length) return
+            blocks.push(`<ul>${listItems.map((item) => `<li>${inline(item)}</li>`).join('')}</ul>`)
+            listItems = []
+        }
+
+        String(markdown || '').split(/\r?\n/).forEach((line) => {
+            const heading = line.match(/^(#{1,3})\s+(.+)$/)
+            if (heading) {
+                flushParagraph()
+                flushList()
+                const level = Math.min(4, heading[1].length + 1)
+                blocks.push(`<h${level}>${inline(heading[2])}</h${level}>`)
+                return
+            }
+            if (/^[-*]\s+/.test(line)) {
+                flushParagraph()
+                listItems.push(line.replace(/^[-*]\s+/, ''))
+                return
+            }
+            if (!line.trim()) {
+                flushParagraph()
+                flushList()
+                return
+            }
+            paragraph.push(line.trim())
+        })
+
+        flushParagraph()
+        flushList()
+        mainContent.innerHTML = `<article class="changelog-view">${blocks.join('')}</article>`
+        mainContent.onclick = null
+    }
+
     const renderContext = async (contextData) => {
         mainContent.innerHTML = await renderSectionTemplate('context', {
             ENV: escapeHtml(contextData.env),
@@ -834,6 +979,7 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
         renderDirectoryContent,
         renderConfig,
         renderHelp,
+        renderChangelog,
         renderContext
     }
 }

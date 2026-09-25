@@ -91,9 +91,17 @@ export const createGitUi = ({ statusBar }) => {
 
         const changed = summary.totalChanged ?? 0
         const staged = summary.stagedCount ?? 0
+        const branch = summary.branch || 'N/A'
+        gitItem.classList.add('source-control-button')
+        gitItem.classList.toggle('has-changes', changed > 0)
+        gitItem.title = `Source Control: ${branch}; ${changed} changed, ${staged} staged`
+        gitItem.setAttribute('aria-label', gitItem.title)
         gitItem.innerHTML = `
-          <span class="status-label">Git:</span>
-          <span class="status-value">${escapeHtml(summary.branch || 'N/A')} | C${changed} | S${staged}</span>
+        <svg class="source-control-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="6" cy="4" r="2"/><circle cx="6" cy="20" r="2"/><circle cx="18" cy="6" r="2"/>
+            <path d="M6 6v12M8 18a8 8 0 0 0 8-8V8"/>
+        </svg>
+        ${changed > 0 ? `<span class="source-control-count">${changed}</span>` : ''}
         `
 
         updateGitPopup(summary)
@@ -102,11 +110,12 @@ export const createGitUi = ({ statusBar }) => {
     const loadGitStatus = async () => {
         try {
             const res = await fetch('/api/git/status')
-            if (!res.ok) return
+            if (!res.ok) return null
             const summary = await res.json()
             upsertGitStatus(summary)
+            return summary
         } catch {
-            // ignore
+            return null
         }
     }
 

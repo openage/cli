@@ -17,7 +17,14 @@ const appRoot = document.querySelector('.app')
 const pageTitle = document.querySelector('#page-title')
 const workspaceLabel = document.querySelector('#workspace-label')
 const userAvatar = document.querySelector('#user-avatar')
+const userPopup = document.querySelector('#user-popup')
+const userPopupDetails = document.querySelector('#user-popup-details')
+const userPopupSessionActions = document.querySelector('#user-session-actions')
+const userLoginAction = document.querySelector('#user-login-action')
 const headerBreadcrumb = document.querySelector('#header-breadcrumb')
+const explorerPane = document.querySelector('#explorer-pane')
+const explorerTitle = document.querySelector('#explorer-title')
+const activityRail = document.querySelector('.activity-rail')
 
 let sessionCountdownTimer = null
 let sessionExpiryMs = null
@@ -26,11 +33,36 @@ let gitRefreshTimer = null
 let pendingTerminalCommand = 'oa pull'
 let currentPath = ''
 let currentSection = 'overview'
+let currentRoot = 'home'
+let isExplorerVisible = true
 let currentEnv = 'prod'
 let currentTenant = ''
 let currentUser = ''
+let currentGitSummary = {}
+let currentContextData = { role: '', application: '', organization: '', session: { remainingMs: null } }
 let isTerminalVisible = true
 let pinnedPaths = []
+let currentConfigPayload = { data: {} }
+const expandedTreePaths = new Set()
+const initializedTreeRoots = new Set()
+
+const syncActivityBar = () => {
+    const labels = new Map([
+        ['home', 'Home'],
+        ['data', 'Data Explorer'],
+        ['specs', 'Specs Explorer'],
+        ['preferences', 'Preferences']
+    ])
+    explorerPane?.classList.toggle('hidden', !isExplorerVisible)
+    appRoot?.classList.toggle('explorer-hidden', !isExplorerVisible)
+    if (explorerTitle) explorerTitle.textContent = labels.get(currentRoot) || 'Home'
+    document.querySelector('#preferences-appearance')?.toggleAttribute('hidden', currentRoot !== 'preferences')
+    document.querySelectorAll('.activity-root[data-root]').forEach((button) => {
+        const active = button.getAttribute('data-root') === currentRoot
+        button.classList.toggle('is-active', active)
+        button.setAttribute('aria-pressed', String(active))
+    })
+}
 
 const cardCommands = commands.filter((cmd) => ['init', 'validate', 'pull', 'push', 'script', 'config', 'context', 'test'].includes(cmd.name))
 const commandIcons = {
@@ -54,6 +86,7 @@ const escapeHtml = (value) => String(value ?? '')
 const renderStatusItem = (label, value, key) => {
     const item = document.createElement('span')
     item.className = 'status-item'
+    item.title = `${label}: ${value || 'N/A'}`
 
     const labelEl = document.createElement('span')
     labelEl.className = 'status-label'
@@ -77,8 +110,61 @@ const getSectionLabel = (section) => {
     if (section === 'config') return 'Config'
     if (section === 'context') return 'Context'
     if (section === 'help') return 'Help'
+    if (section === 'changelog') return 'Changelog'
     if (section === 'pinned') return 'Pinned'
     return 'Overview'
+}
+
+const hasLoggedInUser = () => {
+    const user = String(currentUser || '').trim().toLowerCase()
+    return Boolean(user && !['n/a', 'unknown', 'not signed in', 'anonymous'].includes(user))
+}
+
+const isSessionExpired = () => {
+    const remaining = sessionExpiryMs == null ? null : Math.max(0, sessionExpiryMs - Date.now())
+    return remaining === 0 || sessionStatus.toLowerCase() === 'expired'
+}
+
+const refreshUserPopup = () => {
+    const loggedIn = hasLoggedInUser()
+    const expired = loggedIn && isSessionExpired()
+    const name = String(currentUser || '').trim()
+    const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase() || '').join('') || 'OA'
+
+    if (userAvatar) {
+        userAvatar.classList.toggle('is-logged-out', !loggedIn)
+        userAvatar.classList.toggle('is-session-expired', expired)
+        userAvatar.setAttribute('title', loggedIn ? `${name}${expired ? ' (session expired)' : ''}` : 'Sign in')
+        userAvatar.setAttribute('aria-label', loggedIn ? `User menu for ${name}` : 'Sign in')
+        userAvatar.innerHTML = loggedIn
+            ? escapeHtml(initials)
+            : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="m10 17 5-5-5-5M15 12H3"/></svg>'
+    }
+
+    const nameEl = document.querySelector('#user-popup-name')
+    const roleEl = document.querySelector('#user-popup-role')
+    const applicationEl = document.querySelector('#user-popup-application')
+    const organizationEl = document.querySelector('#user-popup-organization')
+    const sessionStateEl = document.querySelector('#user-popup-session-state')
+    const sessionEl = document.querySelector('#user-popup-session')
+    if (nameEl) nameEl.textContent = loggedIn ? name : 'Not signed in'
+    if (roleEl) roleEl.textContent = loggedIn ? String(currentContextData.role || '') : ''
+    if (applicationEl) applicationEl.textContent = loggedIn ? String(currentContextData.application || 'N/A') : 'N/A'
+    if (organizationEl) organizationEl.textContent = loggedIn ? String(currentContextData.organization || 'N/A') : 'N/A'
+    if (sessionStateEl) {
+        sessionStateEl.textContent = loggedIn ? (expired ? 'Session expired' : 'Signed in') : 'Signed out'
+        sessionStateEl.classList.toggle('is-expired', expired)
+    }
+    if (sessionEl) sessionEl.textContent = loggedIn ? formatRemaining(sessionExpiryMs == null ? currentContextData.session?.remainingMs : Math.max(0, sessionExpiryMs - Date.now())) : 'N/A'
+    if (loggedIn) {
+        userPopupDetails?.removeAttribute('hidden')
+        userPopupSessionActions?.removeAttribute('hidden')
+        userLoginAction?.setAttribute('hidden', '')
+    } else {
+        userPopupDetails?.setAttribute('hidden', '')
+        userPopupSessionActions?.setAttribute('hidden', '')
+        userLoginAction?.removeAttribute('hidden')
+    }
 }
 
 const refreshTopbar = () => {
@@ -90,17 +176,7 @@ const refreshTopbar = () => {
         const envLabel = String(currentEnv || 'prod').toUpperCase()
         workspaceLabel.textContent = `${tenantLabel} | ${envLabel}`
     }
-    if (userAvatar) {
-        const source = String(currentUser || 'oa').trim()
-        const initials = source
-            .split(/\s+/)
-            .filter(Boolean)
-            .slice(0, 2)
-            .map((token) => token[0]?.toUpperCase() || '')
-            .join('') || 'OA'
-        userAvatar.textContent = initials
-        userAvatar.title = source || 'Current user'
-    }
+    refreshUserPopup()
 }
 
 const renderHeaderBreadcrumb = () => {
@@ -153,7 +229,15 @@ const syncFragmentState = () => {
 
 const refreshTerminalTabLabel = () => {
     if (!terminalToggleTab) return
-    terminalToggleTab.textContent = `${isTerminalVisible ? 'x' : '>_'}`
+    const label = isTerminalVisible ? 'Hide Terminal' : 'Show Terminal'
+    terminalToggleTab.setAttribute('title', label)
+    terminalToggleTab.setAttribute('aria-label', label)
+    terminalToggleTab.innerHTML = `
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <path d="M15 3v18M${isTerminalVisible ? '7 9l3 3-3 3' : '10 9l-3 3 3 3'}" />
+        </svg>
+    `
 }
 
 const setTerminalVisibility = (visible, skipSave = false) => {
@@ -234,6 +318,21 @@ const loadMeta = async (path = '$content', metaFile = '') => {
     return res.json()
 }
 
+const loadFileContent = async (targetPath) => {
+    const query = new URLSearchParams({ path: targetPath })
+    const res = await fetch(`/api/file?${query.toString()}`)
+    return res.json()
+}
+
+const saveFileContent = async ({ path, content }) => {
+    const res = await fetch('/api/file', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path, content })
+    })
+    return res.json()
+}
+
 const saveMeta = async ({ path, metaFile, meta, schemaType }) => {
     const res = await fetch('/api/meta', {
         method: 'POST',
@@ -258,29 +357,53 @@ const getRootPathForSection = (section) => {
 const openOverview = async () => {
     currentPath = ''
     currentSection = 'overview'
+    currentRoot = 'home'
+    syncActivityBar()
     refreshTopbar()
     renderHeaderBreadcrumb()
-    await contentUi.renderHome()
+    await contentUi.renderHome(currentContextData, currentGitSummary)
     syncFragmentState()
 }
 
 const openHelp = async () => {
     currentPath = ''
     currentSection = 'help'
+    currentRoot = 'preferences'
+    syncActivityBar()
     refreshTopbar()
     renderHeaderBreadcrumb()
     await contentUi.renderHelp()
     syncFragmentState()
 }
 
-const openContext = async () => {
+const openChangelog = async () => {
+    currentPath = ''
+    currentSection = 'changelog'
+    currentRoot = 'preferences'
+    syncActivityBar()
+    refreshTopbar()
+    renderHeaderBreadcrumb()
+
+    const res = await fetch('/CHANGELOG.md')
+    if (!res.ok) {
+        mainContent.innerHTML = '<p class="summary">Unable to load the changelog.</p>'
+        return
+    }
+    await contentUi.renderChangelog(await res.text())
+    syncFragmentState()
+}
+
+const openContext = async (focusId = '') => {
     currentPath = ''
     currentSection = 'context'
+    currentRoot = 'preferences'
+    syncActivityBar()
     refreshTopbar()
     renderHeaderBreadcrumb()
     const res = await fetch('/api/context')
     const data = await res.json()
     await contentUi.renderContext(data)
+    if (focusId) mainContent?.querySelector(`#${CSS.escape(focusId)}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     syncFragmentState()
 }
 
@@ -329,10 +452,13 @@ const openPinned = async () => {
 const openConfig = async () => {
     currentPath = ''
     currentSection = 'config'
+    currentRoot = 'preferences'
+    syncActivityBar()
     refreshTopbar()
     renderHeaderBreadcrumb()
     ui.progress({ label: 'Loading Config', value: 40, message: 'Reading settings from disk...' })
     const payload = await loadConfig()
+    currentConfigPayload = payload
     ui.progress({ value: 100, message: 'Rendering configuration editor...' })
     await contentUi.renderConfig(
         payload,
@@ -376,9 +502,23 @@ const openDirectory = async (path = '', section = currentSection, selectedPath =
             section: currentSection,
             payload: metaPayload,
             loadMeta: async (targetPath, metaFile) => loadMeta(targetPath, metaFile),
+            loadFileContent: async (targetPath) => loadFileContent(targetPath),
+            saveFileContent: async (payloadToSave) => saveFileContent(payloadToSave),
             saveMeta: async (payloadToSave) => saveMeta(payloadToSave),
             loadGitDiff: async (targetPath) => loadGitDiff(targetPath),
             loadEntries: async (targetPath) => loadDirectoryEntries(targetPath),
+            commitFile: async ({ path: filePath, message }) => {
+                const res = await fetch('/api/git/action', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'commit', filePath, message })
+                })
+                const result = await res.json()
+                if (result.summary) currentGitSummary = result.summary
+                currentGitSummary = await gitUi.loadGitStatus() || currentGitSummary
+                return result
+            },
+            refreshDirectory: async (selected) => openDirectory(path, section, selected),
             selectedPath
         }
     )
@@ -395,17 +535,106 @@ const navIcons = {
     context: `<svg class="nav-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>`,
     help: `<svg class="nav-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
     folder: `<svg class="nav-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`,
+    folderOpen: `<svg class="nav-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h6l2 3h10l-2 11H4L2 8a2 2 0 0 1 1-2Z"/><path d="M3 9h18"/></svg>`,
+    chevron: `<svg class="tree-chevron-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="m5 3 5 5-5 5"/></svg>`,
     parent: `<svg class="nav-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>`
 }
 
-const renderDirectoryNav = async (path = currentPath, section = currentSection) => {
+const renderDirectoryNav = async (path = currentPath, section = currentSection, ensureCurrentPath = true) => {
     try {
+        currentRoot = section === 'specs' ? 'specs' : (section === 'data' || section === 'pinned' ? 'data' : (['config', 'context', 'help', 'changelog'].includes(section) ? 'preferences' : 'home'))
+        syncActivityBar()
         const rootPath = getRootPathForSection(section)
         const showFolderRows = section === 'data' || section === 'specs'
         const activePath = path || rootPath
         let entries = []
         if (showFolderRows) {
             entries = await loadDirectoryEntries(activePath)
+        }
+        const treeEntries = new Map([[activePath, entries]])
+
+        const getTreeEntries = async (directoryPath) => {
+            if (treeEntries.has(directoryPath)) return treeEntries.get(directoryPath)
+            const children = await loadDirectoryEntries(directoryPath)
+            treeEntries.set(directoryPath, children)
+            return children
+        }
+
+        if (showFolderRows && !initializedTreeRoots.has(rootPath)) {
+            initializedTreeRoots.add(rootPath)
+            expandedTreePaths.add(rootPath)
+        }
+
+        if (showFolderRows && ensureCurrentPath && activePath.startsWith(`${rootPath}/`)) {
+            const segments = activePath.slice(rootPath.length + 1).split('/').filter(Boolean)
+            let ancestor = rootPath
+            for (const segment of segments) {
+                expandedTreePaths.add(ancestor)
+                ancestor = `${ancestor}/${segment}`
+            }
+            expandedTreePaths.add(ancestor)
+        }
+
+        const getExplorerFileIcon = (name) => {
+            const lowerName = name.toLowerCase()
+            const extension = lowerName.includes('.') ? lowerName.split('.').pop() : ''
+            const types = {
+                json: ['json', '{}'],
+                js: ['javascript', 'JS'],
+                mjs: ['javascript', 'JS'],
+                cjs: ['javascript', 'JS'],
+                ts: ['typescript', 'TS'],
+                tsx: ['typescript', 'TS'],
+                jsx: ['react', 'JSX'],
+                html: ['html', '<>'],
+                css: ['css', '#'],
+                scss: ['css', '#'],
+                md: ['markdown', 'M'],
+                yml: ['yaml', 'Y'],
+                yaml: ['yaml', 'Y'],
+                xml: ['xml', '<>'],
+                svg: ['image', 'SVG'],
+                png: ['image', 'IMG'],
+                jpg: ['image', 'IMG'],
+                jpeg: ['image', 'IMG'],
+                gif: ['image', 'IMG'],
+                mp4: ['video', '▶'],
+                mov: ['video', '▶'],
+                pdf: ['pdf', 'PDF'],
+                txt: ['text', 'TXT']
+            }
+            const [type, label] = lowerName === 'package.json'
+                ? ['npm', 'N']
+                : (types[extension] || ['default', '·'])
+            return `<span class="vscode-file-icon icon-${type}" aria-hidden="true"><svg viewBox="0 0 16 18"><path d="M2 1.5h7l5 5v10H2z"/><path d="M9 1.5v5h5"/></svg><span>${label}</span></span>`
+        }
+
+        const renderTreeEntries = async (parentPath, childEntries) => {
+            const rows = []
+            for (const entry of childEntries) {
+                const fullPath = `${parentPath}/${entry.name}`
+                if (entry.type === 'directory') {
+                    const expanded = expandedTreePaths.has(fullPath)
+                    const nestedEntries = expanded ? await getTreeEntries(fullPath) : []
+                    const nestedRows = expanded
+                        ? await renderTreeEntries(fullPath, nestedEntries)
+                        : ''
+                    rows.push(`
+                      <div class="tree-node">
+                        <div class="tree-row">
+                          <button type="button" class="tree-toggle" data-tree-toggle="${escapeHtml(fullPath)}" aria-label="${expanded ? 'Collapse' : 'Expand'} ${escapeHtml(entry.name)}" aria-expanded="${expanded}">${navIcons.chevron}</button>
+                          <button type="button" class="nav-link tree-folder-label ${currentPath === fullPath ? 'is-active' : ''}" data-section="${section}" data-dir-path="${escapeHtml(fullPath)}">${expanded ? navIcons.folderOpen : navIcons.folder}<span class="dir-name">${escapeHtml(entry.name)}</span></button>
+                        </div>
+                        <div class="tree-children" data-tree-children="${escapeHtml(fullPath)}" ${expanded ? '' : 'hidden'}>${expanded ? nestedRows || '<p class="tree-empty">Empty folder</p>' : ''}</div>
+                      </div>
+                    `)
+                } else {
+                    rows.push(`
+                      <button type="button" class="nav-link tree-file-label" data-section="${section}" data-file-parent="${escapeHtml(parentPath)}" data-select-file-path="${escapeHtml(fullPath)}">${getExplorerFileIcon(entry.name)}<span class="dir-name">${escapeHtml(entry.name)}</span></button>
+                    `)
+                }
+            }
+            return rows.join('')
         }
 
         const parentPath = (() => {
@@ -417,37 +646,47 @@ const renderDirectoryNav = async (path = currentPath, section = currentSection) 
             return candidate || rootPath
         })()
 
-        const folderRows = entries
-            .filter((entry) => entry.type === 'directory')
-            .map((entry) => {
-                const fullPath = activePath ? `${activePath}/${entry.name}` : entry.name
-                return `<button type="button" class="nav-link dir-item is-directory" data-section="${section}" data-dir-path="${fullPath}">${navIcons.folder}<span class="dir-name">${entry.name}</span></button>`
-            }).join('')
+        const treeMarkup = showFolderRows && expandedTreePaths.has(rootPath)
+            ? await renderTreeEntries(rootPath, await getTreeEntries(rootPath))
+            : ''
+        const treeRootExpanded = expandedTreePaths.has(rootPath)
 
-        dirList.innerHTML = `
-          <div class="nav-group">
-            <h4>OPERATIONS</h4>
-            <button type="button" class="nav-link ${section === 'overview' ? 'is-active' : ''}" data-page="overview">${navIcons.overview}<span>Home</span></button>
-            <button type="button" class="nav-link ${section === 'data' ? 'is-active' : ''}" data-page="data">${navIcons.data}<span>Data</span></button>
-            ${section === 'data' ? `
-              ${activePath !== rootPath ? `<button type="button" class="nav-link dir-item" data-section="data" data-dir-path="${parentPath}">${navIcons.parent}<span>..</span></button>` : ''}
-              ${folderRows || '<p class="summary nav-empty">No folders</p>'}
-            ` : ''}
-            <button type="button" class="nav-link ${section === 'specs' ? 'is-active' : ''}" data-page="specs">${navIcons.specs}<span>Specs</span></button>
-            ${section === 'specs' ? `
-              ${activePath !== rootPath ? `<button type="button" class="nav-link dir-item" data-section="specs" data-dir-path="${parentPath}">${navIcons.parent}<span>..</span></button>` : ''}
-              ${folderRows || '<p class="summary nav-empty">No folders</p>'}
-            ` : ''}
-            <button type="button" class="nav-link ${section === 'pinned' ? 'is-active' : ''}" data-page="pinned">${navIcons.pinned}<span>Pinned</span></button>
-          </div>
-          
-          <div class="nav-group">
-            <h4>SYSTEM</h4>
-            <button type="button" class="nav-link ${section === 'config' ? 'is-active' : ''}" data-page="config">${navIcons.config}<span>Config</span></button>
-            <button type="button" class="nav-link ${section === 'context' ? 'is-active' : ''}" data-page="context">${navIcons.context}<span>Context</span></button>
-            <button type="button" class="nav-link ${section === 'help' ? 'is-active' : ''}" data-page="help">${navIcons.help}<span>Help</span></button>
-          </div>
-        `
+        const configSections = Object.keys(currentConfigPayload?.data || {})
+            .sort((a, b) => a.localeCompare(b))
+            .map((name) => `<button type="button" class="nav-link config-nav-link" data-config-section="${escapeHtml(name)}"><span class="nav-icon config-section-dot">·</span><span>${escapeHtml(name)}</span></button>`)
+            .join('')
+
+        if (currentRoot === 'home') {
+            dirList.innerHTML = '<p class="nav-hint">Workspace overview and quick-start commands.</p>'
+        } else if (currentRoot === 'preferences') {
+            dirList.innerHTML = `
+                            <div class="nav-group preferences-links">
+                                <h4>Preferences</h4>
+                                <button type="button" class="nav-link ${section === 'config' ? 'is-active' : ''}" data-page="config">${navIcons.config}<span>Configuration</span></button>
+                                ${section === 'config' ? configSections || '<p class="summary nav-empty">No config sections</p>' : ''}
+                                <button type="button" class="nav-link ${section === 'context' ? 'is-active' : ''}" data-page="context">${navIcons.context}<span>Context</span></button>
+                                <button type="button" class="nav-link" data-page="user"><svg class="nav-icon user-nav-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span>Current User</span></button>
+                                <button type="button" class="nav-link ${section === 'changelog' ? 'is-active' : ''}" data-page="changelog">${navIcons.specs}<span>Changelog</span></button>
+                                <button type="button" class="nav-link ${section === 'help' ? 'is-active' : ''}" data-page="help">${navIcons.help}<span>Help</span></button>
+                            </div>
+                        `
+        } else {
+            const page = currentRoot
+            const selectedSection = page === 'data' && section === 'pinned' ? 'pinned' : section
+            dirList.innerHTML = `
+                            <div class="nav-group">
+                                <h4>${page === 'data' ? 'Data Explorer' : 'Specs Explorer'}</h4>
+                                ${selectedSection === page ? `
+                                    <div class="tree-row">
+                                      <button type="button" class="tree-toggle" data-tree-toggle="${escapeHtml(rootPath)}" aria-label="${treeRootExpanded ? 'Collapse' : 'Expand'} ${page === 'data' ? '$content' : '$specs'}" aria-expanded="${treeRootExpanded}">${navIcons.chevron}</button>
+                                      <button type="button" class="nav-link tree-folder-label tree-root-label is-active" data-page="${page}">${treeRootExpanded ? navIcons.folderOpen : navIcons.folder}<span>${page === 'data' ? '$content' : '$specs'}</span></button>
+                                    </div>
+                                    <div class="tree-children tree-root-children" ${treeRootExpanded ? '' : 'hidden'}>${treeRootExpanded ? treeMarkup || '<p class="tree-empty">No files or folders</p>' : ''}</div>
+                                ` : `<button type="button" class="nav-link" data-page="${page}">${navIcons[page]}<span>${page === 'data' ? '$content' : '$specs'}</span></button>`}
+                                ${page === 'data' ? `<button type="button" class="nav-link ${section === 'pinned' ? 'is-active' : ''}" data-page="pinned">${navIcons.pinned}<span>Pinned</span></button>` : ''}
+                            </div>
+                        `
+        }
 
         dirList.onclick = async (event) => {
             const pageTarget = event.target.closest('[data-page]')
@@ -461,6 +700,11 @@ const renderDirectoryNav = async (path = currentPath, section = currentSection) 
                 if (page === 'help') {
                     await openHelp()
                     await renderDirectoryNav('', 'help')
+                    return
+                }
+                if (page === 'changelog') {
+                    await openChangelog()
+                    await renderDirectoryNav('', 'changelog')
                     return
                 }
                 if (page === 'data') {
@@ -490,6 +734,37 @@ const renderDirectoryNav = async (path = currentPath, section = currentSection) 
                     await renderDirectoryNav('', 'context')
                     return
                 }
+                if (page === 'user') {
+                    await openContext('context-user')
+                    await renderDirectoryNav('', 'context')
+                    return
+                }
+            }
+
+            const configSection = event.target.closest('[data-config-section]')
+            if (configSection) {
+                mainContent.querySelector(`#config-section-${CSS.escape(configSection.dataset.configSection || '')}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                return
+            }
+
+            const treeToggle = event.target.closest('[data-tree-toggle]')
+            if (treeToggle) {
+                const treePath = treeToggle.dataset.treeToggle || ''
+                if (expandedTreePaths.has(treePath)) {
+                    expandedTreePaths.delete(treePath)
+                } else {
+                    expandedTreePaths.add(treePath)
+                }
+                await renderDirectoryNav(currentPath, section, false)
+                return
+            }
+
+            const fileTarget = event.target.closest('[data-select-file-path]')
+            if (fileTarget) {
+                const parentPath = fileTarget.dataset.fileParent || activePath
+                await openDirectory(parentPath, section, fileTarget.dataset.selectFilePath || '')
+                await renderDirectoryNav(parentPath, section)
+                return
             }
 
             const target = event.target.closest('[data-dir-path]')
@@ -512,39 +787,55 @@ const renderDirectoryNav = async (path = currentPath, section = currentSection) 
 }
 
 const renderSessionTimeLeft = () => {
-    const sessionLeft = statusBar.querySelector('[data-context-key="sessionRemaining"]')
-    if (!sessionLeft) return
-
-    const remaining = sessionExpiryMs == null ? null : Math.max(0, sessionExpiryMs - Date.now())
-    sessionLeft.textContent = formatRemaining(remaining)
-    const statusItem = sessionLeft.closest('.status-item')
-    const existingButton = statusItem?.querySelector('[data-renew-session]')
-    const isExpired = (remaining !== null && remaining <= 0) || sessionStatus.toLowerCase() === 'expired'
-    if (isExpired) {
-        if (!existingButton) {
-            const renewButton = document.createElement('button')
-            renewButton.type = 'button'
-            renewButton.className = 'status-item-button'
-            renewButton.dataset.renewSession = 'true'
-            renewButton.textContent = 'Renew'
-            statusItem?.appendChild(renewButton)
-        }
-    } else {
-        existingButton?.remove()
-    }
+    refreshUserPopup()
 }
 
 const renewSession = async (button) => {
+    const action = button.dataset.userAction || 'renew'
     button.disabled = true
-    button.textContent = 'Renewing...'
+    button.textContent = action === 'login' ? 'Signing in...' : 'Renewing...'
     try {
         const res = await fetch('/api/auth/renew', { method: 'POST' })
         if (!res.ok) throw new Error('Authentication failed')
         await loadContext()
+        button.disabled = false
+        button.textContent = action === 'login' ? 'Sign in' : 'Renew session'
     } catch {
         button.disabled = false
-        button.textContent = 'Renew'
+        button.textContent = action === 'login' ? 'Sign in' : 'Renew session'
         alert('Authentication failed. Please try again.')
+    }
+}
+
+const logoutSession = async (button) => {
+    const feedback = document.querySelector('#user-popup-feedback')
+    button.disabled = true
+    button.textContent = 'Signing out...'
+    try {
+        const res = await fetch('/api/logout', { method: 'POST' })
+        const result = await res.json().catch(() => ({}))
+        if (!res.ok || !result.isSuccess) {
+            const message = result.message || (res.status === 404
+                ? 'Sign-out endpoint unavailable. Restart the OA web server and try again.'
+                : `Unable to sign out (${res.status}).`)
+            throw new Error(message)
+        }
+        currentUser = ''
+        currentContextData = {}
+        currentTenant = ''
+        currentEnv = ''
+        sessionStatus = 'logged out'
+        sessionExpiryMs = null
+        refreshTopbar()
+        userPopup?.classList.add('hidden')
+        userAvatar?.setAttribute('aria-expanded', 'false')
+        button.disabled = false
+        button.textContent = 'Sign out'
+        await loadContext()
+    } catch (error) {
+        button.disabled = false
+        button.textContent = 'Sign out'
+        if (feedback) feedback.textContent = error.message || 'Unable to sign out.'
     }
 }
 
@@ -557,6 +848,7 @@ const loadContext = async () => {
         }
         ui.progress({ value: 60, message: 'Processing application state...' })
         const data = await res.json()
+        currentContextData = data
         window.oaContext = data
         pinnedPaths = Array.isArray(data.pinned)
             ? data.pinned.filter((item) => typeof item === 'string' && /^(\$content|\$specs)\/.*\.json$/i.test(item))
@@ -571,16 +863,18 @@ const loadContext = async () => {
         renderHeaderBreadcrumb()
         refreshTerminalTabLabel()
 
-        const brandArea = document.querySelector('.brand > div')
-        if (brandArea && data.web) {
+        const brandLink = document.querySelector('#brand-link')
+        if (brandLink && data.web) {
             const token = data.session?.token || ''
             const url = `${data.web.startsWith('http') ? data.web : `https://${data.web}`}?session-token=${token}`
-            brandArea.innerHTML = `<strong>OA CLI</strong><br /><a href="${url}" target="_blank" class="brand-host" title="Open ${data.web} in new tab">${data.web}</a>`
+            brandLink.href = url
+            brandLink.title = `Open ${data.web} in new tab`
+            brandLink.setAttribute('aria-label', `OA CLI, open ${data.web} in a new tab`)
         }
 
         statusBar.innerHTML = ''
         sessionExpiryMs = data.session?.expiresAt ? new Date(data.session.expiresAt).getTime() : null
-        renderStatusItem('Session Left', formatRemaining(data.session?.remainingMs), 'sessionRemaining')
+        renderSessionTimeLeft()
 
         ui.progress({ value: 80, message: 'Refreshing Git status...' })
         if (sessionCountdownTimer) {
@@ -593,11 +887,17 @@ const loadContext = async () => {
             renderSessionTimeLeft()
         }
 
-        await gitUi.loadGitStatus()
+        currentGitSummary = await gitUi.loadGitStatus() || currentGitSummary
+        if (currentSection === 'overview') await contentUi.renderHome(data, currentGitSummary)
 
         if (!gitRefreshTimer) {
-            gitRefreshTimer = window.setInterval(() => {
-                gitUi.loadGitStatus()
+            gitRefreshTimer = window.setInterval(async () => {
+                const summary = await gitUi.loadGitStatus()
+                if (!summary) return
+                currentGitSummary = summary
+                if (currentSection === 'overview') {
+                    await contentUi.renderHome(currentContextData, currentGitSummary)
+                }
             }, 15000)
         }
         ui.progress(false)
@@ -609,6 +909,7 @@ const loadContext = async () => {
 
 const init = async () => {
     themeUi.init()
+    await contentUi.renderHome(currentContextData, currentGitSummary)
     await loadContext()
 
     if (headerBreadcrumb) {
@@ -639,16 +940,70 @@ const init = async () => {
                 await openHelp()
                 return
             }
+
+            if (currentSection === 'changelog') {
+                await openChangelog()
+                return
+            }
         })
     }
 
-    statusBar.addEventListener('click', (event) => {
-        const button = event.target.closest('[data-renew-session]')
-        if (button) renewSession(button)
+    userAvatar?.addEventListener('click', () => {
+        const isOpen = userPopup?.classList.toggle('hidden') === false
+        userAvatar.setAttribute('aria-expanded', String(isOpen))
+        if (isOpen) userPopup?.querySelector('[data-user-action]')?.focus()
+    })
+    userPopup?.addEventListener('click', async (event) => {
+        const button = event.target.closest('[data-user-action]')
+        if (!button) return
+        if (button.dataset.userAction === 'logout') {
+            await logoutSession(button)
+        } else {
+            await renewSession(button)
+        }
+    })
+    document.addEventListener('click', (event) => {
+        if (event.target.closest('#user-popup') || event.target.closest('#user-avatar')) return
+        userPopup?.classList.add('hidden')
+        userAvatar?.setAttribute('aria-expanded', 'false')
+    })
+    document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape' || userPopup?.classList.contains('hidden')) return
+        userPopup.classList.add('hidden')
+        userAvatar?.setAttribute('aria-expanded', 'false')
+        userAvatar?.focus()
     })
 
     gitUi.ensureGitPopup()
     terminalUi.render()
+    activityRail?.addEventListener('click', async (event) => {
+        const button = event.target.closest('[data-root]')
+        if (!button) return
+        const root = button.dataset.root
+        if (root === currentRoot) {
+            isExplorerVisible = !isExplorerVisible
+            syncActivityBar()
+            return
+        }
+        currentRoot = root
+        isExplorerVisible = true
+        syncActivityBar()
+        if (root === 'home') {
+            await openOverview()
+            await renderDirectoryNav('', 'overview')
+        } else if (root === 'data' || root === 'specs') {
+            const rootPath = getRootPathForSection(root)
+            await openDirectory(rootPath, root)
+            await renderDirectoryNav(rootPath, root)
+        } else {
+            await openConfig()
+            await renderDirectoryNav('', 'config')
+        }
+    })
+    document.querySelector('#explorer-collapse')?.addEventListener('click', () => {
+        isExplorerVisible = false
+        syncActivityBar()
+    })
     terminalToggleTab?.addEventListener('click', () => {
         setTerminalVisibility(!isTerminalVisible)
     })
@@ -689,6 +1044,9 @@ const init = async () => {
     } else if (section === 'help') {
         await openHelp()
         await renderDirectoryNav('', 'help')
+    } else if (section === 'changelog') {
+        await openChangelog()
+        await renderDirectoryNav('', 'changelog')
     } else if (section === 'pinned') {
         await openPinned()
         await renderDirectoryNav('', 'pinned')
@@ -697,6 +1055,8 @@ const init = async () => {
         await renderDirectoryNav('', 'overview')
     }
 
+    isExplorerVisible = true
+    syncActivityBar()
     gitUi.bindStatusBarToggle()
     setTerminalVisibility(isTerminalVisible, true)
 }
