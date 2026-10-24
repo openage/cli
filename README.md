@@ -26,12 +26,12 @@ node index.js --help
    ```
    These can also be passed as global options with any command.
 
-2. The CLI will prompt for authentication when needed. Session tokens are cached securely in `.oa/cache`.
+2. The CLI will prompt for authentication when needed. Session context is stored in the local `.cache` folder.
 
 ### Workspace Structure
 The CLI uses the following folder structure in your workspace:
-- `.cache` - Encrypted session cache
-- `.oa/settings.json` - CLI configuration (with environment-specific overrides like `.oa/settings.dev.json`)
+- `.cache` - Runtime cache, including session context
+- `.oa/settings/` - CLI configuration (default and environment-specific settings)
 - `.oa/meta` - Per-folder remote metadata for mapping local to remote resources
 - `.logs` - Operation logs
 - `data` - Data folders (e.g., `data/system/navs`)
@@ -55,9 +55,11 @@ Use `--help` with any command for detailed options:
 oa pull --help
 ```
 
+For a feature-by-feature overview and how each capability works, see [Key features and mechanisms](./docs/features-and-mechanisms.md).
+
 ## Configuration
 
-Manage CLI settings stored in `.oa/settings.json`.
+Manage CLI settings stored in `.oa/settings/`.
 
 ```bash
 # View all settings
@@ -182,6 +184,8 @@ The remote command stores metadata in `.oa/meta/`, creating a mapping that inclu
 
 This metadata is used by push and pull operations to maintain the relationship between local files and their remote counterparts, enabling smart sync operations.
 
+For details on what this metadata tracks and how it differs from local Git status, see [Local and remote file tracking](./docs/local-and-remote-file-tracking.md).
+
 ## Testing
 
 Run JSON-based test specifications with request/response validation.
@@ -244,9 +248,9 @@ Example script:
 
 - **Debug logging**: Add `--log-level debug` to commands
 - **Check logs**: Review `.logs/` for detailed request/response records
-- **Authentication issues**: Re-run the command to re-authenticate, or clear `.oa/cache`
+- **Authentication issues**: Re-run the command to re-authenticate, or clear `.cache`
 - **URI confusion**: Use `file://` or `folder://` for local paths, `get://` or `search://` for remote
-- **Configuration**: Edit `.oa/settings.json` directly or use `oa config`
+- **Configuration**: Edit the JSON files in `.oa/settings/` directly or use `oa config`
 
 ## Examples
 
@@ -285,4 +289,3 @@ node scripts/build-win.mjs --platform all                     # All platforms
 ```
 
 Outputs to `../../builds/`.
-

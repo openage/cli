@@ -1,9 +1,10 @@
 # Rule: Update Help Documentation
 
-Whenever a new feature is added to the OA CLI or the Web Interface, the help documentation MUST be updated accordingly to reflect the changes.
+Whenever code or configuration is changed, review the relevant documentation and update it in the same change to keep it accurate. This includes bug fixes, behavior changes, new features, and internal changes covered by developer documentation.
 
 ## Requirements
-- Update `web/htmls/sections/help.html` to include details about the new feature.
-- Ensure the feature is described for both Web and CLI usage where applicable.
-- If the feature introduces new commands, they must be listed in the CLI section.
-- If the feature introduces new UI workflows, they must be listed in the Web section.
+- Update the appropriate documentation, such as `README.md`, files under `docs/`, or CLI/Web help.
+- For new features in the OA CLI or Web Interface, update `web/htmls/sections/help.html`.
+- Describe new features for both Web and CLI usage where applicable.
+- List new commands in the CLI section and new UI workflows in the Web section.
+- If no documentation needs changing, briefly explain why in the final response.
