@@ -3,6 +3,21 @@
 Notable changes to the OA CLI are recorded here.
 
 
+## [2.5.0] - 2026-10-24
+
+### Added
+
+- Added a two-pane local/remote JSON comparison viewer with syntax highlighting, aligned changes, inline differences, keyboard navigation, and whitespace filtering.
+- Added folder comparison with `index.json` remote mappings, inherited path queries, and local/remote file presence indicators.
+- Added folder file creation and remote-to-local line or hunk application in the web viewer.
+- Added remote pull snapshots to file metadata for future three-way merges.
+- Added focus mode, sidebar tabs, and sidebar visibility controls to file comparison.
+
+### Changed
+
+- Limited remote publishing in the web viewer to the full local file; remote pulls replace the full local file.
+- Added browser Back and Forward navigation for folder and file views.
+
 ## [2.4.0] - 2026-09-22
 
 ### Added

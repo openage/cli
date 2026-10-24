@@ -1,5 +1,16 @@
 import { renderExamples } from './templates.js'
 import { copyText, buildAbsoluteUrl, getFileIcon, escapeHtml } from './utils.js'
+import { createDiffViewer } from './diff-viewer.js'
+
+const renderGitDiff = (source) => String(source || '').split(/\r?\n/).map((line) => {
+    let kind = 'context'
+    if (/^\+\+\+|^---/.test(line)) kind = 'file'
+    else if (/^\+/.test(line)) kind = 'added'
+    else if (/^-/.test(line)) kind = 'removed'
+    else if (/^@@/.test(line)) kind = 'hunk'
+    else if (/^(diff --git|index |new file mode|deleted file mode|similarity index)/.test(line)) kind = 'meta'
+    return `<span class="git-diff-line git-diff-line--${kind}">${escapeHtml(line) || '&nbsp;'}</span>`
+}).join('')
 
 export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUseCommand, onAddLocalPath, isPinned, onTogglePin }) => {
     const sectionTemplateCache = new Map()
@@ -141,6 +152,10 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
         const folderWebPath = `/${path || ''}`.replace(/\/+$/, '') || '/'
         const isMetaEnabled = Boolean(metaSupport.enabled)
         const rootKind = metaSupport.section === 'specs' ? 'specs' : 'content'
+        let activeFolderContents = entries
+        let activeRemoteListing = rootKind === 'content' && metaSupport.loadRemoteDirectory
+            ? await metaSupport.loadRemoteDirectory(path)
+            : null
 
         const getCommandsForEntry = (entry) => {
             const rel = String(entry?.cwdRelativePath || '').trim()
@@ -204,10 +219,14 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
             ? metaSupport.payload
             : (isMetaEnabled && metaSupport.loadMeta ? await metaSupport.loadMeta(path || (rootKind === 'specs' ? '$specs' : '$content')) : null)
 
-        const renderDetails = (entry, metaPayload, diffText = '', fileCount = null, fileContent = '') => {
+        const renderDetails = (entry, metaPayload, diffText = '', fileCount = null, fileContent = '', remoteContent = '', remoteError = '') => {
             const commands = getCommandsForEntry(entry)
             const isFile = entry.type === 'file'
             const isJsonFile = isFile && entry.name.toLowerCase().endsWith('.json')
+            const remoteMapping = metaPayload?.meta?.remote
+            const remoteTarget = remoteMapping?.service && remoteMapping?.collection
+                ? `${remoteMapping.service}/${remoteMapping.collection}${remoteMapping.id ? `/${remoteMapping.id}` : ''}`
+                : ''
             const pinned = isJsonFile && isPinned?.(entry.path)
             const schemaOptions = [...(metaPayload?.schemaOptions || []), ...(metaPayload?.schemaType ? [{ value: metaPayload.schemaType, label: metaPayload.schemaType }] : [])]
                 .filter((item, index, arr) => item?.value && arr.findIndex((other) => other?.value === item.value) === index)
@@ -225,8 +244,10 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
             const hasChanges = isFile && (Boolean(diffText.trim()) || entry.gitStatus !== 'clean')
             const actionBar = `
                             <div class="file-context-bar">
-                                <button type="button" class="copy-btn" data-run-command="${escapeHtml(commands.primary)}">${rootKind === 'specs' ? 'Test' : 'Pull'}</button>
-                                <button type="button" class="copy-btn" data-run-command="${escapeHtml(commands.secondary)}">${rootKind === 'specs' ? 'Validate' : 'Push'}</button>
+                                ${!isFile ? '<button type="button" class="copy-btn" data-add-file>Add File</button>' : ''}
+                                ${!isFile || rootKind === 'specs' ? `<button type="button" class="copy-btn" data-run-command="${escapeHtml(commands.primary)}">${rootKind === 'specs' ? 'Test' : 'Pull'}</button>
+                                <button type="button" class="copy-btn" data-run-command="${escapeHtml(commands.secondary)}">${rootKind === 'specs' ? 'Validate' : 'Push'}</button>` : ''}
+                                ${isFile && rootKind === 'content' && entry.name.toLowerCase().endsWith('.json') && !remoteError ? `<button type="button" class="copy-btn" data-sync-action="pull">Pull full remote file</button><button type="button" class="copy-btn" data-sync-action="push">Push full local file</button>` : ''}
                                 ${isFile ? `<button type="button" class="copy-btn" data-run-command="${escapeHtml(`oa test${entry.cwdRelativePath ? ` --local ./${entry.cwdRelativePath}` : ''}`)}">Validate Schema</button>` : ''}
                                 ${isFile ? `<button type="button" class="copy-btn" data-open-vscode="${escapeHtml(entry.path)}">Open In Editor</button>` : `<button type="button" class="copy-btn" data-open-path="${escapeHtml(entry.path)}">Open Folder</button>`}
                                 ${isJsonFile ? `<button type="button" class="copy-btn ${pinned ? 'is-pinned' : ''}" data-toggle-pin="${escapeHtml(entry.path)}">${pinned ? 'Unpin' : 'Pin'}</button>` : ''}
@@ -236,13 +257,14 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                         `
             const remotePanel = `
                             <section class="detail-section">
-                                <h3>Remote</h3>
+                                <h3>${isFile ? 'Remote' : 'Folder Metadata'}</h3>
+                                ${remoteTarget ? `<p class="summary" data-folder-remote-mapping>Mapped resource: <code>${escapeHtml(remoteTarget)}</code></p>` : ''}
                                 <form class="meta-form" data-meta-file-form>
                                     <select class="terminal-input" name="metaFile" aria-label="Remote metadata file">
                                         ${[...(metaPayload?.availableMetaFiles || []), metaPayload?.selectedMetaFile || 'meta.json']
-                    .filter((v, i, a) => v && a.indexOf(v) === i)
-                    .sort((a, b) => a.localeCompare(b))
-                    .map((name) => `<option value="${escapeHtml(name)}" ${name === metaPayload?.selectedMetaFile ? 'selected' : ''}>${escapeHtml(name)}</option>`).join('')}
+                                            .filter((v, i, a) => v && a.indexOf(v) === i)
+                                            .sort((a, b) => a.localeCompare(b))
+                                            .map((name) => `<option value="${escapeHtml(name)}" ${name === metaPayload?.selectedMetaFile ? 'selected' : ''}>${escapeHtml(name)}</option>`).join('')}
                                     </select>
                                     <button class="copy-btn" type="submit">Load</button>
                                 </form>
@@ -252,7 +274,7 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                                 </form>
                             </section>
                         `
-            const schemaPanel = `
+            const schemaPanel = isFile ? `
                             <section class="detail-section">
                                 <h3>Schema</h3>
                                 <form class="meta-form" data-meta-schema-form>
@@ -262,19 +284,58 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                                     </select>
                                     <button class="terminal-run" type="submit">Save</button>
                                 </form>
+                                <div class="schema-language-slot" data-language-control-slot></div>
                                 <pre class="terminal-output config-output schema-preview">${escapeHtml(JSON.stringify(metaPayload?.schema || {}, null, 2))}</pre>
                             </section>
-                        `
+                        ` : ''
             const changesPanel = hasChanges ? `
                             <section class="detail-section changes-section">
                                 <h3>Uncommitted Changes</h3>
-                                <pre class="terminal-output config-output">${escapeHtml(diffText || '(Untracked file; current contents will be committed.)')}</pre>
                                 <form class="file-commit-form" data-commit-file-form>
                                     <input class="terminal-input" name="commitMessage" type="text" placeholder="Commit message" aria-label="Commit message" required />
                                     <button class="terminal-run" type="submit">Commit This File</button>
                                 </form>
+                                <pre class="terminal-output config-output git-diff-preview">${renderGitDiff(diffText || '(Untracked file; current contents will be committed.)')}</pre>
                             </section>
                         ` : ''
+            const listingItems = activeRemoteListing?.ok
+                ? activeRemoteListing.items || []
+                : activeFolderContents.map((item) => ({ ...item, localExists: true, remoteExists: false }))
+            const folderEntries = !isFile ? listingItems.map((item) => {
+                const canOpen = Boolean(item.localExists && item.path)
+                const statusRemote = item.type === 'directory'
+                    ? '—'
+                    : item.remoteExists
+                        ? 'Yes'
+                        : activeRemoteListing?.remoteAvailable
+                            ? 'No'
+                            : 'Unavailable'
+                const content = `
+                    <span class="folder-entry-kind" aria-hidden="true">${item.type === 'directory' ? 'DIR' : escapeHtml(getFileIcon(item.name))}</span>
+                    <span class="folder-entry-name">${escapeHtml(item.name)}</span>
+                    <span class="folder-entry-presence" aria-label="Local ${item.localExists ? 'exists' : 'missing'}">${item.localExists ? 'Yes' : 'No'}</span>
+                    <span class="folder-entry-presence" aria-label="Remote ${statusRemote === '—' ? 'not applicable' : statusRemote.toLowerCase()}">${statusRemote}</span>
+                `
+                const attrs = canOpen
+                    ? `type="button" data-select-path="${escapeHtml(item.path)}" data-entry-type="${escapeHtml(item.type)}" data-web-path="${escapeHtml(item.webPath || '')}" data-git-status="${escapeHtml(item.gitStatus || 'clean')}"`
+                    : ''
+                return `<${canOpen ? 'button' : 'div'} class="folder-entry-row${canOpen ? ' is-openable' : ' is-remote-only'}" ${attrs}>${content}</${canOpen ? 'button' : 'div'}>`
+            }).join('') : ''
+            const contextPanels = [
+                { key: 'remote', label: 'Remote', content: remotePanel },
+                ...(isFile ? [{ key: 'schema', label: 'Schema', content: schemaPanel }] : []),
+                ...(hasChanges ? [{ key: 'changes', label: 'Uncommitted Changes', content: changesPanel }] : [])
+            ]
+            const contextSidebar = `
+                <aside class="file-detail-sidebar">
+                    <div class="file-context-tabs" data-context-tabs>
+                        <div class="file-context-tablist" role="tablist" aria-label="File context" data-context-tablist>
+                            ${contextPanels.map((tab, index) => `<button type="button" class="file-context-tab${index === 0 ? ' is-active' : ''}" role="tab" id="file-context-tab-${tab.key}" aria-controls="file-context-panel-${tab.key}" aria-selected="${index === 0}" tabindex="${index === 0 ? '0' : '-1'}" data-context-tab="${tab.key}">${tab.label}</button>`).join('')}
+                        </div>
+                        ${contextPanels.map((tab, index) => `<div class="file-context-tabpanel" role="tabpanel" id="file-context-panel-${tab.key}" aria-labelledby="file-context-tab-${tab.key}" data-context-panel="${tab.key}"${index === 0 ? '' : ' hidden'}>${tab.content}</div>`).join('')}
+                    </div>
+                </aside>
+            `
 
             return `
                             <section class="file-detail-view" id="details-card">
@@ -283,25 +344,46 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                                         <span class="file-icon">${isFile ? escapeHtml(getFileIcon(entry.name)) : 'DIR'}</span>
                                         <div><h2>${escapeHtml(entry.name || '')}</h2><p>${escapeHtml(entry.path || '')}</p></div>
                                     </div>
+                                    ${isJsonFile && rootKind === 'content' ? `<div class="file-detail-header-actions" role="toolbar" aria-label="Comparison actions">
+                                        <button type="button" class="copy-btn" data-viewer-action="sidebar" aria-pressed="true">Hide sidebar</button>
+                                        <button type="button" class="copy-btn" data-viewer-action="focus" aria-pressed="false" title="Expand comparison; press Escape to exit">Focus mode</button>
+                                        <button type="button" class="copy-btn" data-viewer-action="save">Save local</button>
+                                    </div>` : ''}
                                     <button type="button" class="icon-button detail-back" data-details-back title="Back to parent folder" aria-label="Back to parent folder">&times;</button>
                                 </header>
-                                <div class="file-detail-columns">
-                                    <main class="file-detail-main">
-                                        ${actionBar}
+                                ${isFile ? `
+                                    <div class="file-detail-columns">
+                                        <main class="file-detail-main">
+                                            ${actionBar}
+                                            <p class="detail-feedback" data-meta-feedback aria-live="polite"></p>
+                                            ${rootKind === 'content' && entry.name.toLowerCase().endsWith('.json') ? `<div class="diff-viewer-host" data-diff-host></div>${remoteError ? `<p class="diff-error" role="status">${escapeHtml(remoteError)}</p>` : ''}` : `<form class="file-content-editor" data-file-content-form><textarea class="meta-json" name="fileContent" spellcheck="false" aria-label="File contents">${escapeHtml(fileContent || '')}</textarea><button class="terminal-run" type="submit">Save File</button></form>`}
+                                        </main>
+                                        ${contextSidebar}
+                                    </div>
+                                ` : `
+                                    <main class="folder-detail-main">
+                                        <section class="folder-summary-card">
+                                            <h3>Summary</h3>
+                                            <p>${escapeHtml(entry.path || '')}</p>
+                                            <span>${fileCount ?? 0} files · ${entries.filter((item) => item.type === 'directory').length} subfolders</span>
+                                        </section>
                                         <p class="detail-feedback" data-meta-feedback aria-live="polite"></p>
-                                        ${isFile ? `
-                                            <form class="file-content-editor" data-file-content-form>
-                                                <textarea class="meta-json" name="fileContent" spellcheck="false" aria-label="File contents">${escapeHtml(fileContent || '')}</textarea>
-                                                <button class="terminal-run" type="submit">Save File</button>
-                                            </form>
-                                        ` : `<section class="folder-summary"><h3>Folder</h3><p>${fileCount ?? 0} files in this folder</p></section>`}
+                                        <div class="folder-detail-columns">
+                                            <section class="folder-detail-column folder-local-column" aria-labelledby="folder-local-heading">
+                                                <header><h3 id="folder-local-heading">Local</h3>${actionBar}</header>
+                                                <div class="folder-entry-headings" aria-hidden="true"><span>Item</span><span>Local</span><span>Remote</span></div>
+                                                <div class="folder-entry-list" aria-label="Local folder contents">
+                                                    ${folderEntries || '<p class="summary">This folder is empty.</p>'}
+                                                </div>
+                                            </section>
+                                            <section class="folder-detail-column folder-remote-column" aria-labelledby="folder-remote-heading">
+                                                <h3 id="folder-remote-heading">Remote</h3>
+                                                ${activeRemoteListing?.remoteAvailable ? `<p class="folder-remote-refresh" role="status">Refreshed ${escapeHtml(new Date(activeRemoteListing.fetchedAt).toLocaleTimeString())}</p>` : `<p class="folder-remote-refresh" role="status">${escapeHtml(activeRemoteListing?.error || 'Remote listing unavailable. Mapped file metadata is shown where available.')}</p>`}
+                                                ${remotePanel}
+                                            </section>
+                                        </div>
                                     </main>
-                                    <aside class="file-detail-sidebar">
-                                        ${remotePanel}
-                                        ${schemaPanel}
-                                        ${changesPanel}
-                                    </aside>
-                                </div>
+                                `}
                             </section>
                         `
         }
@@ -316,6 +398,7 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
         const directoryPane = mainContent.querySelector('#directory-list-pane')
         const detailsPane = mainContent.querySelector('#details-pane')
         const directorySplit = mainContent.querySelector('.directory-split')
+        directorySplit?.classList.toggle('folder-selected', !metaSupport.selectedPath)
 
         const openInEditor = async (targetPath) => {
             const res = await fetch('/api/open-vscode', {
@@ -330,13 +413,99 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
         }
 
         let activeEntry = folderSummary
-        const bindDetailForms = (entry, metaPayload) => {
+        let activeContextTab = 'remote'
+        const bindDetailForms = (entry, metaPayload, state = {}) => {
             const feedbackEl = detailsPane.querySelector('[data-meta-feedback]')
             const metaFileForm = detailsPane.querySelector('[data-meta-file-form]')
             const schemaForm = detailsPane.querySelector('[data-meta-schema-form]')
             const metaJsonForm = detailsPane.querySelector('[data-meta-json-form]')
             const fileContentForm = detailsPane.querySelector('[data-file-content-form]')
             const commitFileForm = detailsPane.querySelector('[data-commit-file-form]')
+            const contextTabList = detailsPane.querySelector('[data-context-tablist]')
+            const contextTabButtons = [...(contextTabList?.querySelectorAll('[data-context-tab]') || [])]
+            const contextTabPanels = [...(detailsPane.querySelectorAll('[data-context-panel]') || [])]
+            const activateContextTab = (key, focus = false) => {
+                const selected = contextTabButtons.find((button) => button.dataset.contextTab === key) || contextTabButtons[0]
+                if (!selected) return
+                activeContextTab = selected.dataset.contextTab
+                contextTabButtons.forEach((button) => {
+                    const active = button === selected
+                    button.setAttribute('aria-selected', String(active))
+                    button.tabIndex = active ? 0 : -1
+                    button.classList.toggle('is-active', active)
+                })
+                contextTabPanels.forEach((panel) => {
+                    panel.hidden = panel.dataset.contextPanel !== activeContextTab
+                })
+                if (focus) selected.focus()
+            }
+            activateContextTab(activeContextTab)
+            contextTabList?.addEventListener('click', (event) => {
+                const button = event.target.closest('[data-context-tab]')
+                if (button) activateContextTab(button.dataset.contextTab)
+            })
+            contextTabList?.addEventListener('keydown', (event) => {
+                const keys = ['ArrowLeft', 'ArrowRight', 'Home', 'End']
+                if (!keys.includes(event.key) || !contextTabButtons.length) return
+                event.preventDefault()
+                const index = contextTabButtons.indexOf(event.target.closest('[data-context-tab]'))
+                const nextIndex = event.key === 'Home'
+                    ? 0
+                    : event.key === 'End'
+                        ? contextTabButtons.length - 1
+                        : (index + (event.key === 'ArrowRight' ? 1 : -1) + contextTabButtons.length) % contextTabButtons.length
+                activateContextTab(contextTabButtons[nextIndex].dataset.contextTab, true)
+            })
+            const diffHost = detailsPane.querySelector('[data-diff-host]')
+            let diffViewer = null
+            if (diffHost && metaSupport.loadRemoteFile) {
+                diffViewer = createDiffViewer({
+                    host: diffHost,
+                    path: entry.path,
+                    localText: state.fileContent ?? '',
+                    remoteText: state.remoteContent ?? '',
+                    onSave: async (content) => {
+                        const saved = await metaSupport.saveFileContent({ path: entry.path, content })
+                        return saved?.ok ? saved : { ok: false, error: saved?.error || 'Unable to save local file.' }
+                    }
+                })
+                const languageControl = diffHost.querySelector('.diff-language-label')
+                const languageSlot = detailsPane.querySelector('[data-language-control-slot]')
+                if (languageControl && languageSlot) languageSlot.appendChild(languageControl)
+            }
+            detailsPane.querySelectorAll('[data-viewer-action]').forEach((button) => button.addEventListener('click', () => {
+                if (button.dataset.viewerAction === 'sidebar') diffViewer?.toggleSidebar()
+                else if (button.dataset.viewerAction === 'focus') diffViewer?.toggleFocusMode()
+                else if (button.dataset.viewerAction === 'save') diffViewer?.save()
+            }))
+
+            detailsPane.querySelectorAll('[data-sync-action]').forEach((button) => button.addEventListener('click', async () => {
+                const action = button.dataset.syncAction
+                const message = action === 'pull'
+                    ? 'Pull the full remote file and replace the local file?'
+                    : 'Push the full local file and replace the remote resource?'
+                if (!window.confirm(message)) return
+                button.disabled = true
+                if (feedbackEl) feedbackEl.textContent = action === 'pull' ? 'Pulling remote file…' : 'Pushing full local file…'
+                if (action === 'push' && diffViewer) {
+                    const savedLocal = await metaSupport.saveFileContent({ path: entry.path, content: diffViewer.getLocal() })
+                    if (!savedLocal?.ok) {
+                        button.disabled = false
+                        if (feedbackEl) feedbackEl.textContent = savedLocal?.error || 'Unable to save local file before pushing.'
+                        return
+                    }
+                }
+                const result = await metaSupport.runSyncAction?.({ action, path: entry.path, cwdRelativePath: entry.cwdRelativePath })
+                if (!result?.ok) {
+                    button.disabled = false
+                    if (feedbackEl) feedbackEl.textContent = result?.stderr || result?.error || 'The remote action failed.'
+                    return
+                }
+                diffViewer?.destroy()
+                await selectEntry(entry)
+                const refreshedFeedback = detailsPane.querySelector('[data-meta-feedback]')
+                if (refreshedFeedback) refreshedFeedback.textContent = action === 'pull' ? 'Remote file pulled; merge base saved.' : 'Full local file pushed.'
+            }))
 
             commitFileForm?.addEventListener('submit', async (event) => {
                 event.preventDefault()
@@ -366,8 +535,8 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                 const fileCount = entry.type === 'directory'
                     ? (entry.path === path ? folderSummary.fileCount : ((await metaSupport.loadEntries?.(entry.path)) || []).filter((item) => item.type === 'file').length)
                     : null
-                detailsPane.innerHTML = renderDetails(entry, nextMeta, diffRes.diff || '', fileCount, currentFile?.content || '')
-                bindDetailForms(entry, nextMeta)
+                detailsPane.innerHTML = renderDetails(entry, nextMeta, diffRes.diff || '', fileCount, currentFile?.content || '', state.remoteContent || '', state.remoteError || '')
+                bindDetailForms(entry, nextMeta, { ...state, fileContent: currentFile?.content || '' })
             })
 
             schemaForm?.addEventListener('submit', async (event) => {
@@ -387,8 +556,8 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                 const fileCount = entry.type === 'directory'
                     ? (entry.path === path ? folderSummary.fileCount : ((await metaSupport.loadEntries?.(entry.path)) || []).filter((item) => item.type === 'file').length)
                     : null
-                detailsPane.innerHTML = renderDetails(entry, nextMeta, diffRes.diff || '', fileCount, currentFile?.content || '')
-                bindDetailForms(entry, nextMeta)
+                detailsPane.innerHTML = renderDetails(entry, nextMeta, diffRes.diff || '', fileCount, currentFile?.content || '', state.remoteContent || '', state.remoteError || '')
+                bindDetailForms(entry, nextMeta, { ...state, fileContent: currentFile?.content || '' })
             })
 
             metaJsonForm?.addEventListener('submit', async (event) => {
@@ -415,8 +584,8 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                 const fileCount = entry.type === 'directory'
                     ? (entry.path === path ? folderSummary.fileCount : ((await metaSupport.loadEntries?.(entry.path)) || []).filter((item) => item.type === 'file').length)
                     : null
-                detailsPane.innerHTML = renderDetails(entry, nextMeta, diffRes.diff || '', fileCount, currentFile?.content || '')
-                bindDetailForms(entry, nextMeta)
+                detailsPane.innerHTML = renderDetails(entry, nextMeta, diffRes.diff || '', fileCount, currentFile?.content || '', state.remoteContent || '', state.remoteError || '')
+                bindDetailForms(entry, nextMeta, { ...state, fileContent: currentFile?.content || '' })
             })
 
             fileContentForm?.addEventListener('submit', async (event) => {
@@ -437,14 +606,20 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                     ? (entry.path === path ? folderSummary.fileCount : ((await metaSupport.loadEntries?.(entry.path)) || []).filter((item) => item.type === 'file').length)
                     : null
                 if (feedbackEl) feedbackEl.textContent = 'File saved.'
-                detailsPane.innerHTML = renderDetails(entry, nextMeta || {}, diffRes.diff || '', fileCount, currentFile?.content || '')
-                bindDetailForms(entry, nextMeta || {})
+                detailsPane.innerHTML = renderDetails(entry, nextMeta || {}, diffRes.diff || '', fileCount, currentFile?.content || '', state.remoteContent || '', state.remoteError || '')
+                bindDetailForms(entry, nextMeta || {}, { ...state, fileContent: currentFile?.content || '' })
             })
         }
 
         const selectEntry = async (entry) => {
             activeEntry = entry
+            activeContextTab = 'remote'
+                activeFolderContents = entry.type === 'directory' && entry.path !== path
+                    ? ((await metaSupport.loadEntries?.(entry.path)) || [])
+                    : entries
+            metaSupport.onSelectPath?.(entry.type === 'file' || entry.path !== path ? entry.path : '')
             directorySplit?.classList.toggle('file-selected', entry.type === 'file')
+            directorySplit?.classList.toggle('folder-selected', entry.type === 'directory')
             const selectedRows = mainContent.querySelectorAll('.dir-row.is-selected')
             selectedRows.forEach((node) => node.classList.remove('is-selected'))
             const selectedRow = mainContent.querySelector(`.dir-row[data-select-path="${CSS.escape(entry.path)}"]`)
@@ -453,21 +628,61 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
             const metaPayload = isMetaEnabled && metaSupport.loadMeta
                 ? await metaSupport.loadMeta(entry.path)
                 : (rootMeta || {})
+            activeRemoteListing = entry.type === 'directory' && rootKind === 'content' && metaSupport.loadRemoteDirectory
+                ? await metaSupport.loadRemoteDirectory(entry.path)
+                : null
             const diffRes = entry.type === 'file' && metaSupport.loadGitDiff
                 ? await metaSupport.loadGitDiff(entry.path)
                 : { diff: '' }
             const fileContent = entry.type === 'file' && metaSupport.loadFileContent
                 ? await metaSupport.loadFileContent(entry.path)
                 : { ok: true, content: '' }
+            const remoteResult = entry.type === 'file' && rootKind === 'content' && entry.name.toLowerCase().endsWith('.json') && metaSupport.loadRemoteFile
+                ? await metaSupport.loadRemoteFile(entry.path)
+                : null
+            const comparisonState = {
+                fileContent: fileContent?.content || '',
+                remoteContent: remoteResult?.ok ? remoteResult.content : '',
+                remoteError: remoteResult && !remoteResult.ok ? remoteResult.error || 'Remote comparison is unavailable.' : ''
+            }
             const fileCount = entry.type === 'directory'
-                ? (entry.path === path ? folderSummary.fileCount : ((await metaSupport.loadEntries?.(entry.path)) || []).filter((item) => item.type === 'file').length)
+                ? activeFolderContents.filter((item) => item.type === 'file').length
                 : null
 
-            detailsPane.innerHTML = renderDetails(entry, metaPayload || {}, diffRes.diff || '', fileCount, fileContent?.content || '')
-            bindDetailForms(entry, metaPayload || {})
+            detailsPane.innerHTML = renderDetails(entry, metaPayload || {}, diffRes.diff || '', fileCount, fileContent?.content || '', comparisonState.remoteContent, comparisonState.remoteError)
+            bindDetailForms(entry, metaPayload || {}, comparisonState)
         }
 
         mainContent.onclick = async (event) => {
+            const addFile = event.target.closest('[data-add-file]')
+            if (addFile) {
+                if (!metaSupport.createFile) return
+                const name = window.prompt('Enter a file name:', 'new-file.json')
+                if (!name) return
+                addFile.disabled = true
+                const directory = activeEntry.type === 'directory' ? activeEntry.path : path
+                try {
+                    const created = await metaSupport.createFile({ directory, name: name.trim() })
+                    if (!created?.ok) {
+                        const feedback = detailsPane.querySelector('[data-meta-feedback]')
+                        if (feedback) feedback.textContent = created?.error || 'Unable to create file.'
+                        addFile.disabled = false
+                        return
+                    }
+                    if (metaSupport.refreshDirectory) {
+                        await metaSupport.refreshDirectory(created.path)
+                    } else {
+                        const feedback = detailsPane.querySelector('[data-meta-feedback]')
+                        if (feedback) feedback.textContent = `${name.trim()} was created, but the folder could not be refreshed.`
+                    }
+                } catch (error) {
+                    const feedback = detailsPane.querySelector('[data-meta-feedback]')
+                    if (feedback) feedback.textContent = error?.message || 'The file could not be created. Please try again.'
+                    addFile.disabled = false
+                }
+                return
+            }
+
             const back = event.target.closest('[data-details-back]')
             if (back) {
                 const pathToClose = activeEntry.path || ''

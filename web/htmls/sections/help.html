@@ -11,7 +11,9 @@
         <h3><span class="icon" aria-hidden="true">🌐</span> Web Interface Usage</h3>
         <ul class="content-list help-list">
             <li><strong>Directory Browser:</strong> Use the left sidebar to navigate between <em>Data</em> ($content), <em>Specs</em> ($specs), and <em>Config</em>.</li>
-            <li><strong>Resource Management:</strong> Click on files to view metadata, schemas, and git status. Use the "Pull" and "Push" buttons to sync with remote services.</li>
+            <li><strong>File Comparison:</strong> Open a mapped JSON file to compare local and remote content side by side, navigate changes, ignore whitespace, and apply remote lines or hunks locally. Pull replaces the full local file; push publishes the full local file.</li>
+            <li><strong>Folder Comparison:</strong> Folder <code>index.json</code> metadata maps a service and collection; nested folders inherit that mapping and add path query values. Folder contents show local and remote presence.</li>
+            <li><strong>Metadata and Git:</strong> Click files to view remote metadata, schemas, and Git status. Git status remains separate from remote comparison status.</li>
             <li><strong>Terminal Sidebar:</strong> The right sidebar allows you to execute commands directly. Clicking "Edit" or "Pull/Push" in the UI will pre-fill the terminal for you.</li>
             <li><strong>Live Config:</strong> Manage your <code>settings.json</code> directly in the Config section with support for encrypted values.</li>
             <li><strong>Workspace Sync:</strong> The status bar at the bottom shows your current Git branch and pending changes across the workspace.</li>

@@ -8,6 +8,8 @@ The local web workspace provides a browser-based view of selected workspace file
 
 The browser UI lets users browse content and specs, inspect metadata, open files in VS Code, and invoke common commands. Git status and diffs are read from Git commands; actions include staging, unstaging, reverting working-tree changes, and committing. File and directory responses include Git working-tree status, not remote sync status. The server checks requested paths against the workspace boundaries before accessing files.
 
+Mapped JSON files open in a local/remote comparison viewer. Folder `index.json` metadata maps the folder to a service and collection; deeper folders add inherited `path-N` query values. Folder views refresh local and remote listings and show metadata-backed remote presence when the service is unavailable. File views support full-file pulls and pushes, remote-to-local line or hunk application, and save the exact pulled content as the latest merge base. Browser history restores folder and file selections.
+
 ## Use cases
 
 - Browse local content and spec files without switching to a terminal.

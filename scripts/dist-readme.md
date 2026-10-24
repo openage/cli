@@ -1,8 +1,8 @@
-# OA CLI v2.4.0 - Windows Distribution
+# OA CLI v2.5.0 - Windows Distribution
 
 ## Installation
 
-1. Download `oa-cli-v2.4.0-windows.zip`
+1. Download `oa-cli-v2.5.0-windows.zip`
 2. Extract the zip file
 3. Place `oa-cli-v2.4.0-windows.exe` in a directory in your PATH, or run it directly
 
@@ -25,7 +25,7 @@ oa-cli-v2.4.0-windows.exe [command]
 
 - **Size**: ~86MB (includes full Node.js runtime)
 - **Platform**: Windows x64
-- **Version**: 2.4.0
+- **Version**: 2.5.0
 
 ## Support
 

@@ -21,6 +21,30 @@ const readJsonIfExists = (filePath, fallback = {}) => {
     }
 }
 
+const getFolderRemote = (metaRoot, folderSegments) => {
+    if (folderSegments.length < 2) return {}
+    const folderMetaPath = path.join(metaRoot, ...folderSegments, 'index.json')
+    const folderMeta = readJsonIfExists(folderMetaPath, {})
+    return folderMeta.remote || folderMeta.remotes?.origin || {}
+}
+
+const buildRemoteMapping = (folderSegments, inheritedRemote = {}, currentRemote = {}, id = undefined) => {
+    if (folderSegments.length < 2) return null
+    const query = { ...(inheritedRemote.query || {}), ...(currentRemote.query || {}) }
+    for (const key of Object.keys(query)) {
+        if (/^path-\d+$/.test(key)) delete query[key]
+    }
+    for (let index = 2; index < folderSegments.length; index += 1) {
+        query[`path-${index - 1}`] = folderSegments[index]
+    }
+    return {
+        service: currentRemote.service || inheritedRemote.service || folderSegments[0],
+        collection: currentRemote.collection || inheritedRemote.collection || folderSegments[1],
+        ...(Object.keys(query).length ? { query } : {}),
+        ...(id ? { id } : {})
+    }
+}
+
 const getSchemasIndexPath = (file) => file.path('$oa/schemas/index.json')
 
 const readSchemasIndex = (file) => {
@@ -97,14 +121,63 @@ const getMetaPayload = ({ configFolder, targetPath, requestedMetaFile, resolveAp
     const targetFolder = targetType === 'file' ? path.dirname(resolvedTarget) : resolvedTarget
     const relativeFolder = base.toMetaRelative(targetFolder)
     const metaFolder = path.join(metaRoot, relativeFolder === '' ? '' : relativeFolder)
-    const defaultMetaFile = targetType === 'file' ? path.basename(resolvedTarget) : 'meta.json'
-
-    const availableMetaFiles = fs.existsSync(metaFolder)
-        ? fs.readdirSync(metaFolder).filter((name) => name.toLowerCase().endsWith('.json')).sort((a, b) => a.localeCompare(b))
-        : []
+    const defaultMetaFile = targetType === 'file' ? path.basename(resolvedTarget) : 'index.json'
 
     const selectedMetaFile = normalizeMetaFileName(requestedMetaFile || defaultMetaFile, defaultMetaFile)
     const selectedMetaPath = path.join(metaFolder, selectedMetaFile)
+    if (targetType === 'directory' && selectedMetaFile === 'index.json' && !fs.existsSync(selectedMetaPath)) {
+        const metaRootAbs = path.resolve(metaRoot)
+        const metaFolderAbs = path.resolve(metaFolder)
+        if (!withinFolder(metaRootAbs, metaFolderAbs)) {
+            return { ok: false, error: 'Invalid meta folder.' }
+        }
+        fs.mkdirSync(metaFolderAbs, { recursive: true })
+        if (!fs.existsSync(selectedMetaPath)) {
+            const folderSegments = base.kind === 'content'
+                ? relativeFolder.split(path.sep).filter(Boolean)
+                : []
+            try {
+                fs.writeFileSync(selectedMetaPath, `${JSON.stringify(folderSegments.length >= 2 ? { remote: { service: folderSegments[0], collection: folderSegments[1] } } : {}, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' })
+            } catch (error) {
+                if (error.code !== 'EEXIST') throw error
+            }
+        }
+    }
+    if (targetType === 'directory' && selectedMetaFile === 'index.json' && base.kind === 'content') {
+        const folderSegments = relativeFolder.split(path.sep).filter(Boolean)
+        const currentMeta = readJsonIfExists(selectedMetaPath, {})
+        if (folderSegments.length >= 2) {
+            const parentRemote = getFolderRemote(metaRoot, folderSegments.slice(0, -1))
+            const currentRemote = currentMeta.remote || currentMeta.remotes?.origin || {}
+            const folderMapping = buildRemoteMapping(folderSegments, parentRemote, currentRemote)
+            currentMeta.remote = folderMapping
+            delete currentMeta.remotes
+            fs.writeFileSync(selectedMetaPath, `${JSON.stringify(currentMeta, null, 2)}\n`, 'utf8')
+        }
+    }
+    if (targetType === 'file' && base.kind === 'content' && path.extname(resolvedTarget).toLowerCase() === '.json') {
+        const folderSegments = relativeFolder.split(path.sep).filter(Boolean)
+        const parentRemote = getFolderRemote(metaRoot, folderSegments)
+        const currentMeta = readJsonIfExists(selectedMetaPath, {})
+        const currentRemote = currentMeta.remote || currentMeta.remotes?.origin || {}
+        const fileData = readJsonIfExists(resolvedTarget, {})
+        const id = fileData?.id || fileData?.code || currentRemote.id || ''
+        const fileMapping = buildRemoteMapping(folderSegments, parentRemote, currentRemote, id)
+        if (fileMapping) {
+            const metaRootAbs = path.resolve(metaRoot)
+            const metaFolderAbs = path.resolve(metaFolder)
+            if (!withinFolder(metaRootAbs, metaFolderAbs)) {
+                return { ok: false, error: 'Invalid meta folder.' }
+            }
+            fs.mkdirSync(metaFolderAbs, { recursive: true })
+            currentMeta.remote = fileMapping
+            delete currentMeta.remotes
+            fs.writeFileSync(selectedMetaPath, `${JSON.stringify(currentMeta, null, 2)}\n`, 'utf8')
+        }
+    }
+    const availableMetaFiles = fs.existsSync(metaFolder)
+        ? fs.readdirSync(metaFolder).filter((name) => name.toLowerCase().endsWith('.json')).sort((a, b) => a.localeCompare(b))
+        : []
     const meta = readJsonIfExists(selectedMetaPath, {})
     const schemaPath = path.join(metaFolder, 'schema.json')
     const schema = readJsonIfExists(schemaPath, {})

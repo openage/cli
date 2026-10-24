@@ -32,6 +32,7 @@ let sessionStatus = ''
 let gitRefreshTimer = null
 let pendingTerminalCommand = 'oa pull'
 let currentPath = ''
+let currentSelectedPath = ''
 let currentSection = 'overview'
 let currentRoot = 'home'
 let isExplorerVisible = true
@@ -41,6 +42,8 @@ let currentUser = ''
 let currentGitSummary = {}
 let currentContextData = { role: '', application: '', organization: '', session: { remainingMs: null } }
 let isTerminalVisible = true
+let hasInitializedRoute = false
+let isRestoringHistory = false
 let pinnedPaths = []
 let currentConfigPayload = { data: {} }
 const expandedTreePaths = new Set()
@@ -219,11 +222,19 @@ const parseFragmentState = () => {
 const syncFragmentState = () => {
     const params = new URLSearchParams()
     params.set('section', currentSection || 'overview')
-    if (currentPath) params.set('path', currentPath)
+    const routePath = currentSelectedPath || currentPath
+    if (routePath) params.set('path', routePath)
     params.set('terminal', isTerminalVisible ? '1' : '0')
     const next = `#${params.toString()}`
     if (window.location.hash !== next) {
-        window.history.replaceState(null, '', next)
+        const previous = parseFragmentState()
+        const previousSection = previous.section || 'overview'
+        const routeChanged = previousSection !== (currentSection || 'overview') || previous.path !== routePath
+        if (hasInitializedRoute && !isRestoringHistory && routeChanged) {
+            window.history.pushState(null, '', next)
+        } else {
+            window.history.replaceState(null, '', next)
+        }
     }
 }
 
@@ -331,6 +342,52 @@ const saveFileContent = async ({ path, content }) => {
         body: JSON.stringify({ path, content })
     })
     return res.json()
+}
+
+const createFile = async ({ directory, name }) => {
+    try {
+        const res = await fetch('/api/file/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ directory, name })
+        })
+        return await res.json()
+    } catch {
+        return { ok: false, error: 'Unable to connect to the file service.' }
+    }
+}
+
+const loadRemoteFile = async (targetPath) => {
+    const query = new URLSearchParams({ path: targetPath })
+    try {
+        const res = await fetch(`/api/remote-file?${query.toString()}`)
+        return await res.json()
+    } catch {
+        return { ok: false, error: 'Unable to connect to the remote comparison service.' }
+    }
+}
+
+const loadRemoteDirectory = async (targetPath) => {
+    const query = new URLSearchParams({ path: targetPath })
+    try {
+        const res = await fetch(`/api/remote-directory?${query.toString()}`)
+        return await res.json()
+    } catch {
+        return { ok: false, error: 'Unable to connect to the remote folder service.' }
+    }
+}
+
+const runSyncAction = async ({ action, path: targetPath }) => {
+    try {
+        const res = await fetch('/api/remote-file', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action, path: targetPath })
+        })
+        return await res.json()
+    } catch {
+        return { ok: false, error: 'Unable to connect to the remote synchronization service.' }
+    }
 }
 
 const saveMeta = async ({ path, metaFile, meta, schemaType }) => {
@@ -476,6 +533,10 @@ const openDirectory = async (path = '', section = currentSection, selectedPath =
     renderHeaderBreadcrumb()
     ui.progress({ label: 'Navigating', value: 20, message: `Entering ${path || 'root'}...` })
     const entries = await loadDirectoryEntries(path)
+    currentSelectedPath = selectedPath && entries.some((entry) => {
+        const entryPath = path ? `${path}/${entry.name}` : entry.name
+        return entryPath === selectedPath
+    }) ? selectedPath : ''
     const metaEnabled = currentSection === 'data' || currentSection === 'specs'
     ui.progress({ value: 50, message: 'Scanning for metadata and Git status...' })
     const metaPayload = metaEnabled ? await loadMeta(path || '$content') : null
@@ -504,6 +565,14 @@ const openDirectory = async (path = '', section = currentSection, selectedPath =
             loadMeta: async (targetPath, metaFile) => loadMeta(targetPath, metaFile),
             loadFileContent: async (targetPath) => loadFileContent(targetPath),
             saveFileContent: async (payloadToSave) => saveFileContent(payloadToSave),
+            createFile: async (payloadToCreate) => createFile(payloadToCreate),
+            loadRemoteFile: async (targetPath) => loadRemoteFile(targetPath),
+            loadRemoteDirectory: async (targetPath) => loadRemoteDirectory(targetPath),
+            runSyncAction: async (payload) => runSyncAction(payload),
+            onSelectPath: (selected) => {
+                currentSelectedPath = selected || ''
+                syncFragmentState()
+            },
             saveMeta: async (payloadToSave) => saveMeta(payloadToSave),
             loadGitDiff: async (targetPath) => loadGitDiff(targetPath),
             loadEntries: async (targetPath) => loadDirectoryEntries(targetPath),
@@ -1020,45 +1089,69 @@ const init = async () => {
         // ignore
     }
 
-    const fragmentState = parseFragmentState()
-    if (fragmentState.terminal != null) {
-        isTerminalVisible = Boolean(fragmentState.terminal)
+    const renderFragmentRoute = async (fragmentState) => {
+        if (fragmentState.terminal != null) isTerminalVisible = Boolean(fragmentState.terminal)
+        const section = fragmentState.section || 'overview'
+        const pathFromHash = fragmentState.path || ''
+        if (section === 'data') {
+            currentRoot = 'data'
+            const root = getRootPathForSection('data')
+            const targetPath = pathFromHash || root
+            const isJsonFilePath = targetPath.toLowerCase().endsWith('.json')
+            const directoryPath = isJsonFilePath && targetPath.includes('/')
+                ? targetPath.slice(0, targetPath.lastIndexOf('/'))
+                : targetPath
+            const selectedPath = isJsonFilePath ? targetPath : ''
+            await openDirectory(directoryPath, 'data', selectedPath)
+            await renderDirectoryNav(directoryPath, 'data')
+        } else if (section === 'specs') {
+            currentRoot = 'specs'
+            const root = getRootPathForSection('specs')
+            await openDirectory(pathFromHash || root, 'specs')
+            await renderDirectoryNav(pathFromHash || root, 'specs')
+        } else if (section === 'config') {
+            currentRoot = 'preferences'
+            await openConfig()
+            await renderDirectoryNav('', 'config')
+        } else if (section === 'context') {
+            currentRoot = 'home'
+            await openContext()
+            await renderDirectoryNav('', 'context')
+        } else if (section === 'help') {
+            currentRoot = 'home'
+            await openHelp()
+            await renderDirectoryNav('', 'help')
+        } else if (section === 'changelog') {
+            currentRoot = 'home'
+            await openChangelog()
+            await renderDirectoryNav('', 'changelog')
+        } else if (section === 'pinned') {
+            currentRoot = 'data'
+            await openPinned()
+            await renderDirectoryNav('', 'pinned')
+        } else {
+            currentRoot = 'home'
+            await openOverview()
+            await renderDirectoryNav('', 'overview')
+        }
+
+        isExplorerVisible = true
+        syncActivityBar()
+        setTerminalVisibility(isTerminalVisible, true)
     }
 
-    const section = fragmentState.section || 'overview'
-    const pathFromHash = fragmentState.path || ''
-    if (section === 'data') {
-        const root = getRootPathForSection('data')
-        await openDirectory(pathFromHash || root, 'data')
-        await renderDirectoryNav(pathFromHash || root, 'data')
-    } else if (section === 'specs') {
-        const root = getRootPathForSection('specs')
-        await openDirectory(pathFromHash || root, 'specs')
-        await renderDirectoryNav(pathFromHash || root, 'specs')
-    } else if (section === 'config') {
-        await openConfig()
-        await renderDirectoryNav('', 'config')
-    } else if (section === 'context') {
-        await openContext()
-        await renderDirectoryNav('', 'context')
-    } else if (section === 'help') {
-        await openHelp()
-        await renderDirectoryNav('', 'help')
-    } else if (section === 'changelog') {
-        await openChangelog()
-        await renderDirectoryNav('', 'changelog')
-    } else if (section === 'pinned') {
-        await openPinned()
-        await renderDirectoryNav('', 'pinned')
-    } else {
-        await openOverview()
-        await renderDirectoryNav('', 'overview')
-    }
+    window.addEventListener('popstate', async () => {
+        isRestoringHistory = true
+        try {
+            await renderFragmentRoute(parseFragmentState())
+        } finally {
+            isRestoringHistory = false
+        }
+    })
 
-    isExplorerVisible = true
-    syncActivityBar()
+    await renderFragmentRoute(parseFragmentState())
+    hasInitializedRoute = true
     gitUi.bindStatusBarToggle()
-    setTerminalVisibility(isTerminalVisible, true)
 }
 
 init()

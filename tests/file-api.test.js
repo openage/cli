@@ -55,6 +55,7 @@ test('file API can read and write data files', async () => {
 
     const targetPath = '$content/example.json'
     const sample = { hello: 'world' }
+    fs.writeFileSync(path.join(contentRoot, 'example.json'), '', 'utf8')
     const writeReq = makeReq('http://localhost:3000/api/file', 'POST', { path: targetPath, content: JSON.stringify(sample, null, 2) })
     const writeRes = makeRes()
 
@@ -93,4 +94,51 @@ test('file API can read and write data files', async () => {
     const payload = JSON.parse(readRes.body)
     assert.equal(payload.ok, true)
     assert.equal(payload.content, JSON.stringify(sample, null, 2))
+})
+
+test('file API creates new files without overwriting existing files', async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oa-file-create-api-'))
+    const contentRoot = path.join(tempDir, 'content')
+    const targetFolder = path.join(contentRoot, 'nested')
+    fs.mkdirSync(targetFolder, { recursive: true })
+    const fileApi = await import('../web/apis/file.js')
+    const file = {
+        path: (value) => {
+            if (value === '$cwd') return tempDir
+            if (value === '$content') return contentRoot
+            if (value.startsWith('$content/')) return path.join(contentRoot, value.slice('$content/'.length))
+            return path.join(tempDir, value)
+        }
+    }
+    const withinFolder = (base, candidate) => {
+        const rel = path.relative(base, candidate)
+        return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel))
+    }
+    const handle = async (name) => {
+        const req = makeReq('http://localhost:3000/api/file/create', 'POST', { directory: '$content/nested', name })
+        const res = makeRes()
+        fileApi.handleFileApi({
+            req,
+            res,
+            configFolder: tempDir,
+            resolveApiDirectoryTarget: (configFolder, subPath) => (String(subPath || '').trim().startsWith('$') ? file.path(subPath) : path.join(configFolder, subPath)),
+            withinFolder,
+            file,
+            toPosix: (value = '') => value.replaceAll('\\', '/'),
+            logger: () => { }
+        })
+        await new Promise((resolve) => setImmediate(resolve))
+        return res
+    }
+
+    const created = await handle('new.json')
+    assert.equal(created.statusCode, 201)
+    assert.equal(fs.readFileSync(path.join(targetFolder, 'new.json'), 'utf8'), '{}\n')
+
+    const conflict = await handle('new.json')
+    assert.equal(conflict.statusCode, 409)
+    assert.equal(fs.readFileSync(path.join(targetFolder, 'new.json'), 'utf8'), '{}\n')
+
+    const invalid = await handle('../outside.txt')
+    assert.equal(invalid.statusCode, 400)
 })
