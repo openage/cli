@@ -3,6 +3,26 @@
 Notable changes to the OA CLI are recorded here.
 
 
+## [2.6.0] - 2026-10-25
+
+### Added
+
+- Added remote file and folder comparison, remote presence indicators, and line or hunk application in the local web workspace.
+- Added a file monitoring workflow with conflict handling, schema validation, approval queue, dashboard, and logs.
+- Added Data, Specs, and Assets explorers with reusable tabs, image previews, editable specs, and test result summaries.
+- Added comprehensive feature documentation for the CLI and web workspace.
+
+### Changed
+
+- Centralized schema validation for CLI and web operations, and improved monitoring queue handling.
+- Improved the comparison viewer toolbar, accessibility, and navigation behavior.
+
+### Fixed
+
+- Deferred machine-secret initialization to avoid a circular module initialization failure.
+- Prevented slower directory summaries from replacing a more recent selection.
+- Made remote push validation injectable for reliable API handling.
+
 ## [2.5.0] - 2026-10-24
 
 ### Added

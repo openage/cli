@@ -10,8 +10,10 @@
     <section class="card help-card">
         <h3><span class="icon" aria-hidden="true">🌐</span> Web Interface Usage</h3>
         <ul class="content-list help-list">
-            <li><strong>Directory Browser:</strong> Use the left sidebar to navigate between <em>Data</em> ($content), <em>Specs</em> ($specs), and <em>Config</em>.</li>
+            <li><strong>Explorers and tabs:</strong> Use Data Explorer ($content), Specs Explorer ($specs), and Assets Explorer (workspace <code>assets/</code>). Opening an item reuses the current tab; pin a tab to keep it open, use <code>+</code> for a new tab, or open the tab-list menu to find items when the bar is crowded. The toolbar keeps the selected path on the left and actions on the right.</li>
+            <li><strong>Assets:</strong> Browse the workspace's <code>assets/</code> directory. SVG, PNG, JPEG, WebP, and ICO files render in an image preview, with an option to open the served asset in a new tab.</li>
             <li><strong>File Comparison:</strong> Open a mapped JSON file to compare local and remote content side by side, navigate changes, ignore whitespace, and apply remote lines or hunks locally. Pull replaces the full local file; push publishes the full local file.</li>
+            <li><strong>Specs:</strong> Edit a spec in the syntax-highlighted JSON editor, save it, and run Test from the toolbar. The Last run panel shows formatted validation results for that spec. Spec folders summarize passing, failed, and not-started specs and can run the folder tests.</li>
             <li><strong>Folder Comparison:</strong> Folder <code>index.json</code> metadata maps a service and collection; nested folders inherit that mapping and add path query values. Folder contents show local and remote presence.</li>
             <li><strong>Metadata and Git:</strong> Click files to view remote metadata, schemas, and Git status. Git status remains separate from remote comparison status.</li>
             <li><strong>Terminal Sidebar:</strong> The right sidebar allows you to execute commands directly. Clicking "Edit" or "Pull/Push" in the UI will pre-fill the terminal for you.</li>

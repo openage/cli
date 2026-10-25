@@ -16,7 +16,7 @@ This is the feature index for the OA CLI. Each page focuses on one feature and e
 | [API test specifications](./features/api-test-specifications.md) | How JSON specs issue requests and validate responses. |
 | [Scripted workflows](./features/scripted-workflows.md) | How a JSON file runs a sequence of CLI operations. |
 | [Schema validation](./features/schema-validation.md) | How local JSON files are checked against project schemas. |
-| [Local web workspace](./features/local-web-workspace.md) | How the browser UI exposes files, metadata, CLI operations, and Git tools. |
+| [Local web workspace](./features/local-web-workspace.md) | Data, Specs, and Assets Explorers, tabs, image previews, file comparison, spec test results, metadata, CLI operations, and Git tools. |
 | [Diagnostics and logging](./features/diagnostics-and-logging.md) | How logging levels and operation logs support troubleshooting. |
 | [Packaged CLI](./features/packaged-cli.md) | How the Node.js application is built into platform binaries. |
 

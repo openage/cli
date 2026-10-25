@@ -19,6 +19,7 @@ const isImagePath = (value) => imageExtensions.has(`.${String(value || '').split
 
 export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUseCommand, onRunSpecCommand, onAddLocalPath, isPinned, onTogglePin }) => {
     const sectionTemplateCache = new Map()
+    let directoryRenderVersion = 0
     let explorerTabs = []
     let activeExplorerTab = ''
     try {
@@ -191,6 +192,7 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
     }
 
     const renderDirectoryContent = async (path, entries, onOpenFolder, onOpenCrumb, onRefreshNav, metaSupport = {}) => {
+        const renderVersion = ++directoryRenderVersion
         const folderWebPath = `/${path || ''}`.replace(/\/+$/, '') || '/'
         const isMetaEnabled = Boolean(metaSupport.enabled)
         const rootKind = metaSupport.section === 'specs' ? 'specs' : metaSupport.section === 'assets' ? 'assets' : 'content'
@@ -219,22 +221,35 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
         const activeSpecFiles = []
         if (rootKind === 'specs') {
             const visited = new Set()
-            const collectSpecFiles = async (folderPath, folderEntries) => {
-                const key = String(folderPath || '$specs').replace(/\/$/, '')
-                if (visited.has(key)) return
-                visited.add(key)
-                for (const item of folderEntries || []) {
-                    const itemPath = `${key}/${item.name}`
-                    if (item.type === 'directory') {
-                        const nested = await metaSupport.loadEntries?.(itemPath)
-                        if (Array.isArray(nested)) await collectSpecFiles(itemPath, nested)
-                    } else if (item.name?.toLowerCase().endsWith('.json')) {
-                        const specPath = normalizeSpecPath(item.cwdRelativePath || itemPath)
-                        activeSpecFiles.push({ path: itemPath, specPath, cwdRelativePath: item.cwdRelativePath || `specs/${specPath}` })
-                    }
+            let foldersToScan = [{ path: path || '$specs', entries }]
+            while (foldersToScan.length) {
+                const nextFolders = []
+                for (let offset = 0; offset < foldersToScan.length; offset += 8) {
+                    const batch = foldersToScan.slice(offset, offset + 8).filter(({ path: folderPath }) => {
+                        const key = String(folderPath || '$specs').replace(/\/$/, '')
+                        if (visited.has(key)) return false
+                        visited.add(key)
+                        return true
+                    })
+                    const batchResults = await Promise.all(batch.map(async ({ path: folderPath, entries: cachedEntries }) => {
+                        const key = String(folderPath || '$specs').replace(/\/$/, '')
+                        const folderEntries = cachedEntries || await metaSupport.loadEntries?.(folderPath)
+                        const nestedPaths = []
+                        for (const item of folderEntries || []) {
+                            const itemPath = `${key}/${item.name}`
+                            if (item.type === 'directory') {
+                                nestedPaths.push(itemPath)
+                            } else if (item.name?.toLowerCase().endsWith('.json')) {
+                                const specPath = normalizeSpecPath(item.cwdRelativePath || itemPath)
+                                activeSpecFiles.push({ path: itemPath, specPath, cwdRelativePath: item.cwdRelativePath || `specs/${specPath}` })
+                            }
+                        }
+                        return nestedPaths.map((nestedPath) => ({ path: nestedPath }))
+                    }))
+                    nextFolders.push(...batchResults.flat())
                 }
+                foldersToScan = nextFolders
             }
-            await collectSpecFiles(path || '$specs', entries)
         }
         const getSpecFolderCounts = () => {
             const counts = { passing: 0, failed: 0, notStarted: 0 }
@@ -323,6 +338,11 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
         const rootMeta = isMetaEnabled && metaSupport.payload
             ? metaSupport.payload
             : (isMetaEnabled && metaSupport.loadMeta ? await metaSupport.loadMeta(path || (rootKind === 'specs' ? '$specs' : '$content')) : null)
+
+        // Directory summaries may perform many asynchronous reads (notably the
+        // recursive Specs test-status scan). A slower earlier navigation must
+        // never replace the view for the user's latest selection.
+        if (renderVersion !== directoryRenderVersion) return
 
         const renderDetails = (entry, metaPayload, diffText = '', fileCount = null, fileContent = '', remoteContent = '', remoteError = '', remoteExists = null) => {
             const commands = getCommandsForEntry(entry)
@@ -498,12 +518,14 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                         `
         }
 
-        mainContent.innerHTML = await renderSectionTemplate(rootKind === 'specs' ? 'specs' : 'data', {
+        const directoryHtml = await renderSectionTemplate(rootKind === 'specs' ? 'specs' : 'data', {
             FOLDER_WEB_PATH: escapeHtml(folderWebPath),
             BROWSE_PATH: escapeHtml(path || ''),
             DIRECTORY_ROWS: renderRows(metaSupport.selectedPath || '') || '<p class="summary">This folder is empty.</p>',
             DETAILS_CARD: renderDetails(folderSummary, rootMeta || {}, '', folderSummary.fileCount)
         })
+        if (renderVersion !== directoryRenderVersion) return
+        mainContent.innerHTML = directoryHtml
 
         const directoryPane = mainContent.querySelector('#directory-list-pane')
         const detailsPane = mainContent.querySelector('#details-pane')

@@ -68,7 +68,7 @@ const persistRemoteMeta = (file, local, remoteName, mapping, data, { baseSnapsho
     file.meta(id, local, next)
 }
 
-export const handleRemoteFileApi = async ({ req, res, port, configFolder, resolveApiDirectoryTarget, withinFolder, file, toPosix, logger, readRemoteResource = null, writeRemoteResource = null }) => {
+export const handleRemoteFileApi = async ({ req, res, port, configFolder, resolveApiDirectoryTarget, withinFolder, file, toPosix, logger, readRemoteResource = null, writeRemoteResource = null, validateContentFn = validateContent }) => {
     if (!(req.url && new URL(req.url, `http://localhost:${port}`).pathname === '/api/remote-file')) return false
     if (req.method !== 'GET' && req.method !== 'POST') return false
 
@@ -103,7 +103,7 @@ export const handleRemoteFileApi = async ({ req, res, port, configFolder, resolv
             }
             if (action === 'push') {
                 const localText = fs.readFileSync(mapped.resolved, 'utf8')
-                const validation = await validateContent(mapped.resolved, localText, mapped.remote)
+                const validation = await validateContentFn(mapped.resolved, localText, mapped.remote)
                 if (!validation.valid) {
                     sendJson(res, 422, { ok: false, error: 'Push blocked by endpoint schema validation.', schema: validation.schema, schemaFile: validation.schemaFile, errors: validation.errors })
                     return true

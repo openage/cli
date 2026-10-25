@@ -139,6 +139,7 @@ test('full push sends the complete local JSON file and rejects paths outside con
         ...state.common,
         req: makeRequest('http://localhost:3000/api/remote-file', 'POST', { action: 'push', path: '$content/sample.json' }),
         res,
+        validateContentFn: async () => ({ valid: true, schema: 'api.items', schemaFile: '.oa/schemas/api.items.schema.json', errors: [] }),
         writeRemoteResource: async (_remote, payload) => { sent = payload; return { ...payload, id: 'remote-1' } }
     })
     assert.equal(res.statusCode, 200)
