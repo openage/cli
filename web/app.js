@@ -62,7 +62,8 @@ const syncActivityBar = () => {
     const labels = new Map([
         ['home', 'Home'],
         ['data', 'Data Explorer'],
-        ['specs', 'Specs Explorer'],
+        ['assets', 'Assets Explorer'],
+        ['specs', 'Spec Explorer'],
         ['preferences', 'Preferences']
     ])
     explorerPane?.classList.toggle('hidden', !isExplorerVisible)
@@ -193,6 +194,7 @@ const renderStatusItem = (label, value, key) => {
 
 const getSectionLabel = (section) => {
     if (section === 'data') return 'Data'
+    if (section === 'assets') return 'Assets'
     if (section === 'specs') return 'Specs'
     if (section === 'config') return 'Config'
     if (section === 'context') return 'Context'
@@ -276,7 +278,7 @@ const renderHeaderBreadcrumb = () => {
         return
     }
 
-    const root = currentSection === 'data' ? '$content' : (currentSection === 'specs' ? '$specs' : currentSection)
+    const root = currentSection === 'data' ? '$content' : (currentSection === 'specs' ? '$specs' : currentSection === 'assets' ? 'assets' : currentSection)
     const rawPath = currentPath || root
     const segments = String(rawPath).split('/').filter(Boolean)
 
@@ -451,6 +453,19 @@ const createFile = async ({ directory, name }) => {
     }
 }
 
+const createFolder = async ({ directory, name }) => {
+    try {
+        const res = await fetch('/api/file/create-folder', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ directory, name })
+        })
+        return await res.json()
+    } catch {
+        return { ok: false, error: 'Unable to connect to the folder service.' }
+    }
+}
+
 const loadRemoteFile = async (targetPath) => {
     const query = new URLSearchParams({ path: targetPath })
     try {
@@ -501,6 +516,7 @@ const loadGitDiff = async (path) => {
 
 const getRootPathForSection = (section) => {
     if (section === 'data') return '$content'
+    if (section === 'assets') return 'assets'
     if (section === 'specs') return '$specs'
     return ''
 }
@@ -660,12 +676,21 @@ const openDirectory = async (path = '', section = currentSection, selectedPath =
             loadFileContent: async (targetPath) => loadFileContent(targetPath),
             saveFileContent: async (payloadToSave) => saveFileContent(payloadToSave),
             createFile: async (payloadToCreate) => createFile(payloadToCreate),
+            createFolder: async (payloadToCreate) => createFolder(payloadToCreate),
             loadRemoteFile: async (targetPath) => loadRemoteFile(targetPath),
             loadRemoteDirectory: async (targetPath) => loadRemoteDirectory(targetPath),
             runSyncAction: async (payload) => runSyncAction(payload),
             onSelectPath: (selected) => {
                 currentSelectedPath = selected || ''
                 syncFragmentState()
+            },
+            activateTab: async (tab) => {
+                const section = tab.section === 'content' ? 'data' : tab.section
+                const targetPath = tab.path || ''
+                const isFile = tab.type === 'file' || targetPath.toLowerCase().endsWith('.json')
+                const directoryPath = isFile && targetPath.includes('/') ? targetPath.slice(0, targetPath.lastIndexOf('/')) : targetPath
+                await openDirectory(directoryPath, section, isFile ? targetPath : '')
+                await renderDirectoryNav(directoryPath, section)
             },
             saveMeta: async (payloadToSave) => saveMeta(payloadToSave),
             loadGitDiff: async (targetPath) => loadGitDiff(targetPath),
@@ -699,16 +724,17 @@ const navIcons = {
     help: `<svg class="nav-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
     folder: `<svg class="nav-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`,
     folderOpen: `<svg class="nav-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h6l2 3h10l-2 11H4L2 8a2 2 0 0 1 1-2Z"/><path d="M3 9h18"/></svg>`,
+    test: `<svg class="nav-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6M10 3v6l-6 10a1.5 1.5 0 0 0 1.3 2.2h11.4A1.5 1.5 0 0 0 18 19L12 9V3"/><path d="M7 16h10"/></svg>`,
     chevron: `<svg class="tree-chevron-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="m5 3 5 5-5 5"/></svg>`,
     parent: `<svg class="nav-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>`
 }
 
 const renderDirectoryNav = async (path = currentPath, section = currentSection, ensureCurrentPath = true) => {
     try {
-        currentRoot = section === 'specs' ? 'specs' : (section === 'data' || section === 'pinned' ? 'data' : (['config', 'context', 'help', 'changelog'].includes(section) ? 'preferences' : 'home'))
+        currentRoot = section === 'specs' ? 'specs' : section === 'assets' ? 'assets' : (section === 'data' || section === 'pinned' ? 'data' : (['config', 'context', 'help', 'changelog'].includes(section) ? 'preferences' : 'home'))
         syncActivityBar()
         const rootPath = getRootPathForSection(section)
-        const showFolderRows = section === 'data' || section === 'specs'
+        const showFolderRows = section === 'data' || section === 'specs' || section === 'assets'
         const activePath = path || rootPath
         let entries = []
         if (showFolderRows) {
@@ -786,7 +812,7 @@ const renderDirectoryNav = async (path = currentPath, section = currentSection, 
                       <div class="tree-node">
                         <div class="tree-row">
                           <button type="button" class="tree-toggle" data-tree-toggle="${escapeHtml(fullPath)}" aria-label="${expanded ? 'Collapse' : 'Expand'} ${escapeHtml(entry.name)}" aria-expanded="${expanded}">${navIcons.chevron}</button>
-                          <button type="button" class="nav-link tree-folder-label ${currentPath === fullPath ? 'is-active' : ''}" data-section="${section}" data-dir-path="${escapeHtml(fullPath)}">${expanded ? navIcons.folderOpen : navIcons.folder}<span class="dir-name">${escapeHtml(entry.name)}</span></button>
+                          <button type="button" class="nav-link tree-folder-label ${currentPath === fullPath ? 'is-active' : ''}" data-section="${section}" data-dir-path="${escapeHtml(fullPath)}">${section === 'data' ? navIcons.data : section === 'specs' ? navIcons.test : expanded ? navIcons.folderOpen : navIcons.folder}<span class="dir-name">${escapeHtml(entry.name)}</span></button>
                         </div>
                         <div class="tree-children" data-tree-children="${escapeHtml(fullPath)}" ${expanded ? '' : 'hidden'}>${expanded ? nestedRows || '<p class="tree-empty">Empty folder</p>' : ''}</div>
                       </div>
@@ -809,7 +835,7 @@ const renderDirectoryNav = async (path = currentPath, section = currentSection, 
             return candidate || rootPath
         })()
 
-        const treeMarkup = showFolderRows && expandedTreePaths.has(rootPath)
+        const treeMarkup = showFolderRows && (expandedTreePaths.has(rootPath) || section === 'data' || section === 'specs' || section === 'assets')
             ? await renderTreeEntries(rootPath, await getTreeEntries(rootPath))
             : ''
         const treeRootExpanded = expandedTreePaths.has(rootPath)
@@ -838,13 +864,13 @@ const renderDirectoryNav = async (path = currentPath, section = currentSection, 
             const selectedSection = page === 'data' && section === 'pinned' ? 'pinned' : section
             dirList.innerHTML = `
                             <div class="nav-group">
-                                <h4>${page === 'data' ? 'Data Explorer' : 'Specs Explorer'}</h4>
+                                ${page === 'data' ? '<h4>Data Explorer</h4>' : page === 'specs' ? '<h4>Spec Explorer</h4>' : page === 'assets' ? '<h4>Assets Explorer</h4>' : '<h4>Explorer</h4>'}
                                 ${selectedSection === page ? `
-                                    <div class="tree-row">
-                                      <button type="button" class="tree-toggle" data-tree-toggle="${escapeHtml(rootPath)}" aria-label="${treeRootExpanded ? 'Collapse' : 'Expand'} ${page === 'data' ? '$content' : '$specs'}" aria-expanded="${treeRootExpanded}">${navIcons.chevron}</button>
-                                      <button type="button" class="nav-link tree-folder-label tree-root-label is-active" data-page="${page}">${treeRootExpanded ? navIcons.folderOpen : navIcons.folder}<span>${page === 'data' ? '$content' : '$specs'}</span></button>
-                                    </div>
-                                    <div class="tree-children tree-root-children" ${treeRootExpanded ? '' : 'hidden'}>${treeRootExpanded ? treeMarkup || '<p class="tree-empty">No files or folders</p>' : ''}</div>
+                                    ${page === 'data' || page === 'specs' || page === 'assets' ? '' : `<div class="tree-row">
+                                      <button type="button" class="tree-toggle" data-tree-toggle="${escapeHtml(rootPath)}" aria-label="${treeRootExpanded ? 'Collapse' : 'Expand'} $specs" aria-expanded="${treeRootExpanded}">${navIcons.chevron}</button>
+                                      <button type="button" class="nav-link tree-folder-label tree-root-label is-active" data-page="${page}">${treeRootExpanded ? navIcons.folderOpen : navIcons.folder}<span>$specs</span></button>
+                                    </div>`}
+                                    <div class="tree-children tree-root-children" ${page === 'data' || page === 'specs' || page === 'assets' || treeRootExpanded ? '' : 'hidden'}>${page === 'data' || page === 'specs' || page === 'assets' || treeRootExpanded ? treeMarkup || '<p class="tree-empty">No files or folders</p>' : ''}</div>
                                 ` : `<button type="button" class="nav-link" data-page="${page}">${navIcons[page]}<span>${page === 'data' ? '$content' : '$specs'}</span></button>`}
                                 ${page === 'data' ? `<button type="button" class="nav-link ${section === 'pinned' ? 'is-active' : ''}" data-page="pinned">${navIcons.pinned}<span>Pinned</span></button>` : ''}
                             </div>
@@ -880,6 +906,12 @@ const renderDirectoryNav = async (path = currentPath, section = currentSection, 
                     const root = getRootPathForSection('specs')
                     await openDirectory(root, 'specs')
                     await renderDirectoryNav(root, 'specs')
+                    return
+                }
+                if (page === 'assets') {
+                    const root = getRootPathForSection('assets')
+                    await openDirectory(root, 'assets')
+                    await renderDirectoryNav(root, 'assets')
                     return
                 }
                 if (page === 'pinned') {
@@ -1088,7 +1120,7 @@ const init = async () => {
                 return
             }
 
-            if (currentSection === 'data' || currentSection === 'specs') {
+            if (currentSection === 'data' || currentSection === 'specs' || currentSection === 'assets') {
                 await openDirectory(targetPath, currentSection)
                 await renderDirectoryNav(targetPath, currentSection)
                 return
@@ -1180,7 +1212,7 @@ const init = async () => {
             syncActivityBar()
             syncFragmentState()
             await renderMonitorDashboard()
-        } else if (root === 'data' || root === 'specs') {
+        } else if (root === 'data' || root === 'specs' || root === 'assets') {
             const rootPath = getRootPathForSection(root)
             await openDirectory(rootPath, root)
             await renderDirectoryNav(rootPath, root)
@@ -1253,6 +1285,17 @@ const init = async () => {
             const selectedPath = isSpecFilePath ? pathFromHash : ''
             await openDirectory(directoryPath, 'specs', selectedPath)
             await renderDirectoryNav(directoryPath, 'specs')
+        } else if (section === 'assets') {
+            currentRoot = 'assets'
+            const root = getRootPathForSection('assets')
+            const targetPath = pathFromHash || root
+            const isAssetFilePath = targetPath !== root && /\.[^/]+$/.test(targetPath)
+            const directoryPath = isAssetFilePath && targetPath.includes('/')
+                ? targetPath.slice(0, targetPath.lastIndexOf('/'))
+                : targetPath
+            const selectedPath = isAssetFilePath ? targetPath : ''
+            await openDirectory(directoryPath, 'assets', selectedPath)
+            await renderDirectoryNav(directoryPath, 'assets')
         } else if (section === 'logs') {
             currentRoot = 'logs'
             currentSection = 'logs'

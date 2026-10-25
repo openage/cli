@@ -51,12 +51,15 @@ export const handleDirApi = ({
             const relPath = subPath ? `${subPath}/${entry.name}` : entry.name
             const normalizedPath = toPosix(relPath)
             const absolutePath = path.join(target, entry.name)
+            let modifiedAt = null
+            try { modifiedAt = fs.statSync(absolutePath).mtime.toISOString() } catch { /* listing remains useful if stat fails */ }
             return {
                 name: entry.name,
                 path: normalizedPath,
                 type: entryType,
                 webPath: `/${normalizedPath.split('/').map((part) => encodeURIComponent(part)).join('/')}`,
                 mimeType: entryType === 'directory' ? 'inode/directory' : getMimeTypeForPath(entry.name),
+                modifiedAt,
                 gitStatus: entryType === 'directory'
                     ? folderStatusFromMap(statusMap, normalizedPath)
                     : (statusMap.get(normalizedPath) || 'clean'),

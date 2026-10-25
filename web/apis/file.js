@@ -77,6 +77,47 @@ export const handleFileApi = ({ req, res, configFolder, resolveApiDirectoryTarge
         return true
     }
 
+    if (requestUrl.pathname === '/api/file/create-folder' && req.method === 'POST') {
+        readJsonBody(req, 1000000)
+            .then((payload) => {
+                const parentPath = String(payload.directory || '').trim()
+                const name = String(payload.name || '').trim()
+                const hasControlCharacter = [...name].some((character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)
+                if (!parentPath || !name || name !== path.basename(name) || /[<>:"/\\|?*]/.test(name) || hasControlCharacter || name === '.' || name === '..') {
+                    sendJson(res, 400, { ok: false, error: 'Enter a valid folder name and parent folder.' })
+                    return
+                }
+                const resolvedParent = resolveApiDirectoryTarget(configFolder, parentPath)
+                if (!withinFolder(file.path('$cwd'), resolvedParent) || !fs.existsSync(resolvedParent) || !fs.statSync(resolvedParent).isDirectory()) {
+                    sendJson(res, 400, { ok: false, error: 'The selected parent folder is invalid.' })
+                    return
+                }
+                const realParent = fs.realpathSync(resolvedParent)
+                if (!withinFolder(fs.realpathSync(file.path('$cwd')), realParent)) {
+                    sendJson(res, 400, { ok: false, error: 'The parent folder resolves outside the workspace.' })
+                    return
+                }
+                const targetPath = path.join(resolvedParent, name)
+                try {
+                    fs.mkdirSync(targetPath)
+                } catch (error) {
+                    if (error.code === 'EEXIST') {
+                        sendJson(res, 409, { ok: false, error: 'A folder with that name already exists.' })
+                        return
+                    }
+                    throw error
+                }
+                const relativePath = path.relative(file.path('$cwd'), targetPath)
+                const appPath = parentPath.startsWith('$') ? `${parentPath.replace(/\\/g, '/')}/${name}` : toPosix(relativePath)
+                sendJson(res, 201, { ok: true, path: appPath })
+            })
+            .catch((error) => {
+                logger?.('handlers.serve')?.error?.(error)
+                sendJson(res, 400, { ok: false, error: 'Unable to create the folder.' })
+            })
+        return true
+    }
+
     if (req.method === 'GET') {
         try {
             const targetPath = requestUrl.searchParams.get('path') || ''
@@ -88,6 +129,33 @@ export const handleFileApi = ({ req, res, configFolder, resolveApiDirectoryTarge
             const resolved = resolveRequestedFile({ configFolder, resolveApiDirectoryTarget, file, targetPath, withinFolder })
             if (!resolved.ok) {
                 sendJson(res, 400, resolved)
+                return true
+            }
+
+            if (requestUrl.searchParams.get('raw') === '1') {
+                const extension = path.extname(resolved.resolvedTarget).toLowerCase()
+                const mimeTypes = {
+                    '.svg': 'image/svg+xml',
+                    '.png': 'image/png',
+                    '.jpg': 'image/jpeg',
+                    '.jpeg': 'image/jpeg',
+                    '.webp': 'image/webp',
+                    '.ico': 'image/x-icon'
+                }
+                const mimeType = mimeTypes[extension]
+                if (!mimeType) {
+                    sendJson(res, 415, { ok: false, error: 'Raw preview is supported only for SVG, PNG, JPEG, WebP, and ICO files.' })
+                    return true
+                }
+                const raw = fs.readFileSync(resolved.resolvedTarget)
+                res.writeHead(200, {
+                    'Content-Type': mimeType,
+                    'Content-Length': raw.length,
+                    'Content-Disposition': 'inline',
+                    'Cache-Control': 'no-store',
+                    'X-Content-Type-Options': 'nosniff'
+                })
+                res.end(raw)
                 return true
             }
 

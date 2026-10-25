@@ -96,6 +96,7 @@ export const handleRemoteDirectoryApi = async ({ req, res, port, configFolder, r
                     name: localFileName || `${record.code || record.id || remote.id}.json`,
                     id: remote.id,
                     code: record.code,
+                    modifiedAt: record.timestamp || record.updatedAt || remote.timestamp || remote.updatedAt || null,
                     remote,
                     identities: [...valuesForIdentity(record), ...valuesForIdentity(remote), path.basename(name, path.extname(name)).toLowerCase()]
                         .filter(Boolean),
@@ -157,8 +158,10 @@ export const handleRemoteDirectoryApi = async ({ req, res, port, configFolder, r
                 path: targetPath.startsWith('$') ? `${targetPath.replace(/\/$/, '')}/${entry.name}` : relativePath,
                 type: entry.isDirectory() ? 'directory' : 'file',
                 localExists: true,
+                localModifiedAt: fs.statSync(localPath).mtime.toISOString(),
                 remoteExists: entry.isFile() && (match != null || Boolean(metadataMatch)),
-                remoteItem: match == null ? metadataMatch : remoteItems[match]
+                remoteItem: match == null ? metadataMatch : remoteItems[match],
+                remoteModifiedAt: (match == null ? metadataMatch : remoteItems[match])?.updatedAt || (match == null ? metadataMatch : remoteItems[match])?.modifiedAt || (match == null ? metadataMatch : remoteItems[match])?.timestamp || (match == null ? metadataMatch : remoteItems[match])?.timeStamp || null
             }
         })
 

@@ -12,8 +12,20 @@ const renderGitDiff = (source) => String(source || '').split(/\r?\n/).map((line)
     return `<span class="git-diff-line git-diff-line--${kind}">${escapeHtml(line) || '&nbsp;'}</span>`
 }).join('')
 
+const testPlanIcon = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h6M10 3v6l-6 10a1.5 1.5 0 0 0 1.3 2.2h11.4A1.5 1.5 0 0 0 18 19L12 9V3"/><path d="M7 16h10"/></svg>'
+const tabListIcon = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12M2 6.5h12M2 10h12M2 13.5h12"/></svg>'
+const imageExtensions = new Set(['.svg', '.png', '.jpg', '.jpeg', '.webp', '.ico'])
+const isImagePath = (value) => imageExtensions.has(`.${String(value || '').split('.').pop().toLowerCase()}`)
+
 export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUseCommand, onRunSpecCommand, onAddLocalPath, isPinned, onTogglePin }) => {
     const sectionTemplateCache = new Map()
+    let explorerTabs = []
+    let activeExplorerTab = ''
+    try {
+        const savedTabs = JSON.parse(localStorage.getItem('oa.explorer.tabs') || '{}')
+        explorerTabs = Array.isArray(savedTabs.tabs) ? savedTabs.tabs : []
+        activeExplorerTab = savedTabs.active || ''
+    } catch { /* use an empty tab strip */ }
     let settingsMeta = null
     let specRunResults = {}
     try { specRunResults = JSON.parse(localStorage.getItem('oa.spec.lastRuns') || '{}') } catch { /* ignore invalid saved results */ }
@@ -181,8 +193,10 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
     const renderDirectoryContent = async (path, entries, onOpenFolder, onOpenCrumb, onRefreshNav, metaSupport = {}) => {
         const folderWebPath = `/${path || ''}`.replace(/\/+$/, '') || '/'
         const isMetaEnabled = Boolean(metaSupport.enabled)
-        const rootKind = metaSupport.section === 'specs' ? 'specs' : 'content'
+        const rootKind = metaSupport.section === 'specs' ? 'specs' : metaSupport.section === 'assets' ? 'assets' : 'content'
         let activeFolderContents = entries
+        let activeActionBarHtml = ''
+        let activeTabActionsHtml = ''
         let activeRemoteListing = rootKind === 'content' && metaSupport.loadRemoteDirectory
             ? await metaSupport.loadRemoteDirectory(path)
             : null
@@ -202,16 +216,77 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
             }
         }
 
+        const activeSpecFiles = []
+        if (rootKind === 'specs') {
+            const visited = new Set()
+            const collectSpecFiles = async (folderPath, folderEntries) => {
+                const key = String(folderPath || '$specs').replace(/\/$/, '')
+                if (visited.has(key)) return
+                visited.add(key)
+                for (const item of folderEntries || []) {
+                    const itemPath = `${key}/${item.name}`
+                    if (item.type === 'directory') {
+                        const nested = await metaSupport.loadEntries?.(itemPath)
+                        if (Array.isArray(nested)) await collectSpecFiles(itemPath, nested)
+                    } else if (item.name?.toLowerCase().endsWith('.json')) {
+                        const specPath = normalizeSpecPath(item.cwdRelativePath || itemPath)
+                        activeSpecFiles.push({ path: itemPath, specPath, cwdRelativePath: item.cwdRelativePath || `specs/${specPath}` })
+                    }
+                }
+            }
+            await collectSpecFiles(path || '$specs', entries)
+        }
+        const getSpecFolderCounts = () => {
+            const counts = { passing: 0, failed: 0, notStarted: 0 }
+            activeSpecFiles.forEach(({ specPath }) => {
+                const result = specRunResults[specPath]
+                if (!result) counts.notStarted++
+                else if (Number(result.code) === 0) counts.passing++
+                else counts.failed++
+            })
+            return counts
+        }
+        const renderSpecFolderSummary = () => {
+            const counts = getSpecFolderCounts()
+            return `<div class="spec-folder-run-summary" data-spec-folder-summary aria-label="Last test status"><div><strong>${counts.passing}</strong><span>Passing</span></div><div><strong>${counts.failed}</strong><span>Failed</span></div><div><strong>${counts.notStarted}</strong><span>Not started</span></div></div>`
+        }
+
         const getSelectedRowClass = (selectedPath, rowPath) => (selectedPath && selectedPath === rowPath ? ' is-selected' : '')
 
         const folderSummary = {
             type: 'directory',
-            name: path ? path.split('/').filter(Boolean).at(-1) : (rootKind === 'specs' ? '$specs' : '$content'),
+            name: path ? path.split('/').filter(Boolean).at(-1) : (rootKind === 'specs' ? '$specs' : rootKind === 'assets' ? 'assets' : '$content'),
             path,
             webPath: folderWebPath,
             gitStatus: 'clean',
             cwdRelativePath: '',
             fileCount: entries.filter((entry) => entry.type === 'file').length
+        }
+
+        const saveExplorerTabs = () => {
+            try { localStorage.setItem('oa.explorer.tabs', JSON.stringify({ tabs: explorerTabs, active: activeExplorerTab })) } catch { /* tabs remain for this session */ }
+        }
+        const renderTabStrip = () => {
+            const strip = mainContent.querySelector('[data-explorer-tabbar]')
+            if (!strip) return
+            strip.innerHTML = `<div class="explorer-tabs${explorerTabs.length > 4 ? ' is-crowded' : ''}" role="tablist" aria-label="Open files and folders">${explorerTabs.map((tab) => `<div class="explorer-tab${tab.id === activeExplorerTab ? ' is-active' : ''}${tab.pinned ? ' is-pinned' : ''}" role="presentation"><button type="button" role="tab" aria-selected="${tab.id === activeExplorerTab}" class="explorer-tab-select" data-tab-select="${escapeHtml(tab.id)}" aria-label="${escapeHtml(tab.title)}" title="${escapeHtml(tab.title)}"><span class="explorer-tab-icon" aria-hidden="true">${tab.section === 'specs' ? testPlanIcon : tab.type === 'directory' ? '▰' : getFileIcon(tab.title)}</span><span class="explorer-tab-title">${escapeHtml(tab.title)}</span></button><button type="button" class="explorer-tab-pin" data-tab-pin="${escapeHtml(tab.id)}" aria-label="${tab.pinned ? 'Unpin' : 'Pin'}" title="${tab.pinned ? 'Unpin tab' : 'Keep tab open'}">${tab.pinned ? '●' : '○'}</button><button type="button" class="explorer-tab-close" data-tab-close="${escapeHtml(tab.id)}" aria-label="Close ${escapeHtml(tab.title)}">×</button></div>`).join('')}</div><button type="button" class="explorer-tab-add" data-tab-add aria-label="New tab" title="New tab">+</button><details class="explorer-tab-list"><summary aria-label="List open files" title="List open files">${tabListIcon}</summary><div role="menu">${explorerTabs.map((tab) => `<button type="button" role="menuitem" data-tab-select="${escapeHtml(tab.id)}"><span aria-hidden="true">${tab.section === 'specs' ? testPlanIcon : tab.type === 'directory' ? '▰' : getFileIcon(tab.title)}</span>${escapeHtml(tab.title)}${tab.pinned ? ' •' : ''}</button>`).join('') || '<span class="explorer-tab-list-empty">No open files</span>'}</div></details>`
+        }
+        const renderActionBar = () => {
+            const toolbar = mainContent.querySelector('[data-explorer-toolbar]')
+            if (toolbar) toolbar.innerHTML = activeActionBarHtml
+        }
+        const updateExplorerTab = (entry) => {
+            const tabPath = entry.path || ''
+            let tab = explorerTabs.find((item) => item.id === activeExplorerTab)
+            if (!tab || tab.pinned) {
+                tab = { id: `${rootKind}:${tabPath}:${Date.now()}`, path: tabPath, section: rootKind, type: entry.type, title: entry.name || tabPath || (rootKind === 'specs' ? '$specs' : rootKind === 'assets' ? 'assets' : '$content'), pinned: false }
+                explorerTabs.push(tab)
+                activeExplorerTab = tab.id
+            } else {
+                Object.assign(tab, { path: tabPath, section: rootKind, type: entry.type, title: entry.name || tabPath || (rootKind === 'specs' ? '$specs' : rootKind === 'assets' ? 'assets' : '$content') })
+            }
+            saveExplorerTabs()
+            renderTabStrip()
         }
 
         const renderRows = (selectedPath = '') => {
@@ -252,12 +327,11 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
         const renderDetails = (entry, metaPayload, diffText = '', fileCount = null, fileContent = '', remoteContent = '', remoteError = '', remoteExists = null) => {
             const commands = getCommandsForEntry(entry)
             const isFile = entry.type === 'file'
-            const isJsonFile = isFile && entry.name.toLowerCase().endsWith('.json')
-            const remoteMapping = metaPayload?.meta?.remote
+            const remoteSectionKey = metaPayload?.meta?.remote ? 'remote' : metaPayload?.meta?.remotes?.origin ? 'remotes.origin' : 'remote'
+            const remoteMapping = metaPayload?.meta?.remote || metaPayload?.meta?.remotes?.origin
             const remoteTarget = remoteMapping?.service && remoteMapping?.collection
                 ? `${remoteMapping.service}/${remoteMapping.collection}${remoteMapping.id ? `/${remoteMapping.id}` : ''}`
                 : ''
-            const pinned = isJsonFile && isPinned?.(entry.path)
             const isNavFile = entry.type === 'file' && (entry.path || '').includes('system/navs')
             const navUrl = metaPayload?.meta?.url || ''
             const context = window['oaContext'] || {}
@@ -270,40 +344,50 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                 : ''
 
             const hasChanges = isFile && (Boolean(diffText.trim()) || entry.gitStatus !== 'clean')
+            const isDiffFile = isFile && rootKind === 'content' && entry.name.toLowerCase().endsWith('.json')
             const isSpecFile = rootKind === 'specs' && isFile
+            const isSpecFolder = rootKind === 'specs' && !isFile
+            const isImageFile = isFile && (rootKind === 'content' || rootKind === 'assets') && isImagePath(entry.name)
+            const fileMeta = metaPayload?.meta || {}
+            const localVersionText = metaPayload?.targetModifiedAt || (() => { try { const local = JSON.parse(fileContent || '{}'); return local.version || local.timeStamp || local.timestamp || local.updatedAt || local.modifiedAt || fileMeta.timestamp || '' } catch { return fileMeta.timestamp || '' } })()
+            const remoteVersionText = (() => { try { const remote = JSON.parse(remoteContent || '{}'); return remote.version || remote.timeStamp || remote.timestamp || remote.updatedAt || remote.modifiedAt || '' } catch { return '' } })()
+            const versionDate = (value) => value && !Number.isNaN(Date.parse(value)) ? new Date(value) : null
+            const localVersionDate = versionDate(localVersionText)
+            const remoteVersionDate = versionDate(remoteVersionText)
+            const formatVersionDate = (date) => date ? date.toLocaleString() : 'Unavailable'
+            const lastSync = fileMeta.pulledAt || fileMeta.pushedAt || fileMeta.baseSnapshot?.pulledAt || fileMeta.baseSnapshot?.pushedAt || ''
+            const lastSyncLabel = lastSync && !Number.isNaN(Date.parse(lastSync)) ? new Date(lastSync).toLocaleString() : 'No sync recorded'
+            const conflictStatus = fileMeta.conflict?.status || 'No conflict recorded'
             const specPath = normalizeSpecPath(entry.path)
             const specRunResult = specRunResults[specPath] || null
-            const actionBar = isSpecFile ? '' : `
+            activeTabActionsHtml = ''
+            const actionBar = `
                             <div class="file-context-bar">
-                                ${!isFile ? '<button type="button" class="copy-btn" data-add-file>Add File</button>' : ''}
-                                ${!isFile ? `<button type="button" class="copy-btn" data-run-command="${escapeHtml(commands.primary)}">${rootKind === 'specs' ? 'Test' : 'Pull'}</button>
-                                <button type="button" class="copy-btn" data-run-command="${escapeHtml(commands.secondary)}">${rootKind === 'specs' ? 'Validate' : 'Push'}</button>` : rootKind === 'specs' ? `<button type="button" class="copy-btn" data-run-command="${escapeHtml(commands.secondary)}">Validate</button>` : ''}
-                                ${isFile && rootKind === 'content' && entry.name.toLowerCase().endsWith('.json') && remoteExists === true ? `<button type="button" class="copy-btn" data-sync-action="pull">Pull full remote file</button>` : ''}
-                                ${isFile && rootKind === 'content' && entry.name.toLowerCase().endsWith('.json') && remoteExists === false ? `<button type="button" class="copy-btn" data-sync-action="push">Push full local file</button>` : ''}
-                                ${isFile && !isSpecFile ? `<button type="button" class="copy-btn" data-run-command="${escapeHtml(`oa test${entry.cwdRelativePath ? ` --local ./${entry.cwdRelativePath}` : ''}`)}">Validate Schema</button>` : ''}
-                                ${isFile && !isSpecFile ? `<button type="button" class="copy-btn" data-open-vscode="${escapeHtml(entry.path)}">Open In Editor</button>` : !isFile ? `<button type="button" class="copy-btn" data-open-path="${escapeHtml(entry.path)}">Open Folder</button>` : ''}
-                                ${isJsonFile && !isSpecFile ? `<button type="button" class="copy-btn ${pinned ? 'is-pinned' : ''}" data-toggle-pin="${escapeHtml(entry.path)}">${pinned ? 'Unpin' : 'Pin'}</button>` : ''}
-                                ${!isSpecFile ? `<button type="button" class="copy-btn" data-copy-webpath="${escapeHtml(entry.webPath || '')}">Copy Web URL</button>` : ''}
+                                <div class="diff-file-toolbar-heading"><span class="file-icon">${isSpecFile || isSpecFolder ? testPlanIcon : isFile ? escapeHtml(getFileIcon(entry.name)) : 'DIR'}</span><div><strong>${escapeHtml(entry.name || '')}</strong><small>${escapeHtml(entry.path || '')}</small></div></div>
+                                ${isFile ? `<button type="button" class="copy-btn toolbar-tooltip-action" data-open-vscode="${escapeHtml(entry.path)}" aria-label="Open in editor" title="Open in editor" data-tooltip="Open in editor"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9 2h5v5M14 2 7 9M12 9v4a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h4"/></svg></button>` : ''}
+                                ${!isFile ? '<button type="button" class="copy-btn" data-add-file>Add File</button><button type="button" class="copy-btn" data-add-folder>Add Folder</button>' : ''}
+                                ${isSpecFile ? `<button type="button" class="copy-btn" data-spec-test="${escapeHtml(commands.primary)}" data-spec-path="${escapeHtml(specPath)}">Test</button><button type="button" class="copy-btn" data-run-command="${escapeHtml(commands.secondary)}">Validate</button><button type="submit" form="spec-file-content-form" class="copy-btn spec-save-button">Save</button>` : ''}
+                                ${isSpecFolder ? `<button type="button" class="copy-btn toolbar-tooltip-action" data-spec-folder-test aria-label="Test folder" title="Test folder" data-tooltip="Test folder" ${activeSpecFiles.length ? '' : 'disabled'}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2h4M7 2v4L3.5 12.5A1 1 0 0 0 4.4 14h7.2a1 1 0 0 0 .9-1.5L9 6V2M5.4 11h5.2"/></svg></button>` : !isFile && rootKind === 'content' ? `<button type="button" class="copy-btn toolbar-tooltip-action" data-run-command="${escapeHtml(commands.primary)}" aria-label="Pull folder" title="Pull folder" data-tooltip="Pull folder"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8m-3-3 3 3 3-3M3 12v2h10v-2"/></svg></button><button type="button" class="copy-btn toolbar-tooltip-action" data-run-command="${escapeHtml(commands.secondary)}" aria-label="Push folder" title="Push folder" data-tooltip="Push folder"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14V6m-3 3 3-3 3 3M3 4V2h10v2"/></svg></button>` : ''}
+                                ${isFile && rootKind === 'content' && entry.name.toLowerCase().endsWith('.json') && remoteExists === true ? `<button type="button" class="copy-btn toolbar-tooltip-action" data-sync-action="pull" aria-label="Pull full remote file" title="Pull full remote file" data-tooltip="Pull full remote file"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8m-3-3 3 3 3-3M3 12v2h10v-2"/></svg></button>` : ''}
+                                ${isFile && rootKind === 'content' && entry.name.toLowerCase().endsWith('.json') ? `<button type="button" class="copy-btn toolbar-tooltip-action" data-sync-action="push" aria-label="Push full local file" title="Push full local file" data-tooltip="Push full local file"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14V6m-3 3 3-3 3 3M3 4V2h10v2"/></svg></button>` : ''}
+                                ${!isFile && rootKind === 'content' ? `<button type="button" class="copy-btn toolbar-tooltip-action" data-folder-sidebar-toggle aria-label="Toggle sidebar" title="Toggle sidebar" data-tooltip="Toggle sidebar" aria-pressed="true"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2.5h12v11H2zM10 2.5v11M4 5h4M4 8h4M4 11h4"/></svg></button>` : ''}
+                                ${!isSpecFile && !isSpecFolder ? `<button type="button" class="copy-btn toolbar-tooltip-action" data-copy-webpath="${escapeHtml(entry.webPath || '')}" aria-label="Copy Web URL" title="Copy Web URL" data-tooltip="Copy Web URL"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 9.5 9.5 6.5M5.5 11.5l-1 1a2.5 2.5 0 0 1-3.5-3.5l3-3a2.5 2.5 0 0 1 3.5 0M10.5 4.5l1-1A2.5 2.5 0 0 1 15 7l-3 3a2.5 2.5 0 0 1-3.5 0"/></svg></button>` : ''}
                                 ${!isSpecFile && pageUrl ? `<a href="${escapeHtml(pageUrl)}" target="_blank" class="copy-btn">View Page</a>` : ''}
+                                ${isDiffFile ? `<button type="button" class="copy-btn" data-viewer-action="save">Save</button>` : ''}
+                                ${isDiffFile ? `<button type="button" class="copy-btn toolbar-tooltip-action" data-viewer-action="sidebar" aria-label="Toggle sidebar" title="Toggle sidebar" data-tooltip="Toggle sidebar" aria-pressed="true"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2.5h12v11H2zM10 2.5v11M4 5h4M4 8h4M4 11h4"/></svg></button>` : ''}
                             </div>
                         `
+            activeActionBarHtml = actionBar
+            renderActionBar()
+            renderTabStrip()
             const remotePanel = `
                             <section class="detail-section">
                                 <h3>${isFile ? 'Remote' : 'Folder Metadata'}</h3>
                                 ${remoteTarget ? `<p class="summary" data-folder-remote-mapping>Mapped resource: <code>${escapeHtml(remoteTarget)}</code></p>` : ''}
-                                <form class="meta-form" data-meta-file-form>
-                                    <select class="terminal-input" name="metaFile" aria-label="Remote metadata file">
-                                        ${[...(metaPayload?.availableMetaFiles || []), metaPayload?.selectedMetaFile || 'meta.json']
-                                            .filter((v, i, a) => v && a.indexOf(v) === i)
-                                            .sort((a, b) => a.localeCompare(b))
-                                            .map((name) => `<option value="${escapeHtml(name)}" ${name === metaPayload?.selectedMetaFile ? 'selected' : ''}>${escapeHtml(name)}</option>`).join('')}
-                                    </select>
-                                    <button class="copy-btn" type="submit">Load</button>
-                                </form>
-                                <form class="meta-form meta-form-stack" data-meta-json-form>
-                                    <textarea class="meta-json" name="metaJson" spellcheck="false" aria-label="Remote metadata JSON">${escapeHtml(JSON.stringify(metaPayload?.meta || {}, null, 2))}</textarea>
-                                    <button class="terminal-run" type="submit">Save</button>
-                                </form>
+                                ${isFile ? `<section class="remote-sync-summary"><h4>Summary</h4><dl><div><dt>Local timestamp</dt><dd>${escapeHtml(formatVersionDate(localVersionDate))}</dd></div><div><dt>Remote timestamp</dt><dd>${escapeHtml(formatVersionDate(remoteVersionDate))}</dd></div><div><dt>Last sync</dt><dd>${escapeHtml(lastSyncLabel)}</dd></div><div><dt>Conflict</dt><dd>${escapeHtml(conflictStatus)}</dd></div></dl></section>` : ''}
+                                <div class="meta-section-list">
+                                    ${remoteMapping && typeof remoteMapping === 'object' ? `<form class="meta-form meta-form-stack" data-meta-section-form data-meta-section="${remoteSectionKey}" title="${escapeHtml(metaPayload?.metaFolder && metaPayload?.selectedMetaFile ? `${metaPayload.metaFolder}/${metaPayload.selectedMetaFile}` : '')}"><label>Remote metadata</label><textarea class="meta-json" name="metaSection" spellcheck="false" aria-label="Remote metadata">${escapeHtml(JSON.stringify(remoteMapping, null, 2))}</textarea><button class="terminal-run" type="submit">Save remote</button></form>` : ''}
+                                </div>
                             </section>
                         `
             const schemaPanel = isFile ? `
@@ -311,8 +395,8 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                                 <h3>Schema</h3>
                                 <p class="summary">${metaPayload?.schemaEndpoint ? `Endpoint: <code>${escapeHtml(metaPayload.schemaEndpoint)}</code>` : 'No endpoint mapping available.'}</p>
                                 <p class="summary">${metaPayload?.schemaFile ? `Schema: <code>${escapeHtml(metaPayload.schemaFile)}</code>` : ''}</p>
-                                <div class="schema-language-slot" data-language-control-slot></div>
                                 <pre class="terminal-output config-output schema-preview">${escapeHtml(JSON.stringify(metaPayload?.schema || {}, null, 2))}</pre>
+                                <footer class="schema-actions"><button type="button" class="copy-btn" data-run-command="${escapeHtml(`oa test${entry.cwdRelativePath ? ` --local ./${entry.cwdRelativePath}` : ''}`)}">Validate Schema</button></footer>
                             </section>
                         ` : ''
             const changesPanel = hasChanges ? `
@@ -337,25 +421,35 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                         : activeRemoteListing?.remoteAvailable
                             ? 'No'
                             : 'Unavailable'
-                const content = `
+                const formatEntryTime = (value) => value && !Number.isNaN(Date.parse(value)) ? new Date(value).toLocaleString() : '—'
+                const content = rootKind === 'specs' ? `
+                    <span class="folder-entry-kind" aria-hidden="true">${item.type === 'directory' ? testPlanIcon : escapeHtml(getFileIcon(item.name))}</span>
+                    <span class="folder-entry-name">${escapeHtml(item.name)}</span>
+                ` : rootKind === 'assets' ? `
+                    <span class="folder-entry-kind" aria-hidden="true">${item.type === 'directory' ? '<span class="file-icon folder-icon"></span>' : escapeHtml(getFileIcon(item.name))}</span>
+                    <span class="folder-entry-name">${escapeHtml(item.name)}</span>
+                    <span class="folder-entry-asset-path" title="${escapeHtml(item.webPath || '')}">${escapeHtml(item.type === 'file' ? item.webPath || `/${item.path}` : '')}</span>
+                ` : `
                     <span class="folder-entry-kind" aria-hidden="true">${item.type === 'directory' ? 'DIR' : escapeHtml(getFileIcon(item.name))}</span>
                     <span class="folder-entry-name">${escapeHtml(item.name)}</span>
                     <span class="folder-entry-presence" aria-label="Local ${item.localExists ? 'exists' : 'missing'}">${item.localExists ? 'Yes' : 'No'}</span>
+                    <span class="folder-entry-time" title="Local modified">${escapeHtml(formatEntryTime(item.localModifiedAt || item.modifiedAt))}</span>
                     <span class="folder-entry-presence" aria-label="Remote ${statusRemote === '—' ? 'not applicable' : statusRemote.toLowerCase()}">${statusRemote}</span>
+                    <span class="folder-entry-time" title="Remote modified">${escapeHtml(formatEntryTime(item.remoteModifiedAt || item.remoteItem?.updatedAt || item.remoteItem?.modifiedAt || item.remoteItem?.timestamp || item.remoteItem?.timeStamp))}</span>
                 `
                 const attrs = canOpen
                     ? `type="button" data-select-path="${escapeHtml(item.path)}" data-entry-type="${escapeHtml(item.type)}" data-web-path="${escapeHtml(item.webPath || '')}" data-git-status="${escapeHtml(item.gitStatus || 'clean')}"`
                     : ''
-                return `<${canOpen ? 'button' : 'div'} class="folder-entry-row${canOpen ? ' is-openable' : ' is-remote-only'}" ${attrs}>${content}</${canOpen ? 'button' : 'div'}>`
+                return `<${canOpen ? 'button' : 'div'} class="folder-entry-row${rootKind === 'specs' ? ' specs-entry-row' : ''}${canOpen ? ' is-openable' : ' is-remote-only'}" ${attrs}>${content}</${canOpen ? 'button' : 'div'}>`
             }).join('') : ''
-            const contextPanels = rootKind === 'specs'
+            const contextPanels = rootKind === 'assets' ? [] : rootKind === 'specs'
                 ? [{ key: 'last-run', label: 'Last run', content: `<section class="detail-section"><h3>Last run result</h3><div data-spec-last-run data-spec-path="${escapeHtml(specPath)}">${renderSpecRunResult(specRunResult)}</div></section>` }]
                 : [
                     { key: 'remote', label: 'Remote', content: remotePanel },
-                    ...(isFile ? [{ key: 'schema', label: 'Schema', content: schemaPanel }] : []),
+                    ...(isFile && rootKind === 'content' && entry.name.toLowerCase().endsWith('.json') ? [{ key: 'schema', label: 'Schema', content: schemaPanel }] : []),
                     ...(hasChanges ? [{ key: 'changes', label: 'Uncommitted Changes', content: changesPanel }] : [])
                 ]
-            const contextSidebar = `
+            const contextSidebar = rootKind === 'assets' ? '' : `
                 <aside class="file-detail-sidebar">
                     <div class="file-context-tabs" data-context-tabs>
                         <div class="file-context-tablist" role="tablist" aria-label="File context" data-context-tablist>
@@ -368,31 +462,11 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
 
             return `
                             <section class="file-detail-view" id="details-card">
-                                <header class="file-detail-title">
-                                    <div class="file-detail-heading">
-                                        <span class="file-icon"${rootKind === 'specs' && isFile ? ' aria-label="Test specification" title="Test specification"' : ''}>${rootKind === 'specs' && isFile ? '⚗' : isFile ? escapeHtml(getFileIcon(entry.name)) : 'DIR'}</span>
-                                        <div><h2>${escapeHtml(entry.name || '')}</h2><p>${escapeHtml(entry.path || '')}</p></div>
-                                    </div>
-                                    ${isSpecFile ? `<div class="file-detail-header-actions spec-header-actions" role="toolbar" aria-label="Specification actions">
-                                        <button type="button" class="copy-btn" data-spec-test="${escapeHtml(commands.primary)}" data-spec-path="${escapeHtml(specPath)}">Test</button>
-                                        <button type="button" class="copy-btn" data-run-command="${escapeHtml(commands.secondary)}">Validate</button>
-                                        <button type="button" class="copy-btn" data-open-vscode="${escapeHtml(entry.path)}">Open In Editor</button>
-                                        <button type="submit" form="spec-file-content-form" class="copy-btn spec-save-button">Save</button>
-                                        <button type="button" class="copy-btn ${pinned ? 'is-pinned' : ''}" data-toggle-pin="${escapeHtml(entry.path)}">${pinned ? 'Unpin' : 'Pin'}</button>
-                                    </div>` : ''}
-                                    ${isJsonFile && rootKind === 'content' ? `<div class="file-detail-header-actions" role="toolbar" aria-label="Comparison actions">
-                                        <button type="button" class="copy-btn" data-viewer-action="sidebar" aria-pressed="true">Hide sidebar</button>
-                                        <button type="button" class="copy-btn" data-viewer-action="focus" aria-pressed="false" title="Expand comparison; press Escape to exit">Focus mode</button>
-                                        <button type="button" class="copy-btn" data-viewer-action="save">Save local</button>
-                                    </div>` : ''}
-                                    <button type="button" class="icon-button detail-back" data-details-back title="Back to parent folder" aria-label="Back to parent folder">&times;</button>
-                                </header>
                                 ${isFile ? `
-                                    <div class="file-detail-columns">
+                                    <div class="file-detail-columns${rootKind === 'assets' ? ' assets-file-detail-columns' : ''}">
                                         <main class="file-detail-main">
-                                            ${actionBar}
-                                            <p class="detail-feedback" data-meta-feedback aria-live="polite"></p>
-                                            ${rootKind === 'content' && entry.name.toLowerCase().endsWith('.json') ? `<div class="diff-viewer-host" data-diff-host></div>${remoteError ? `<p class="diff-error" role="status">${escapeHtml(remoteError)}</p>` : remoteExists === false ? '<p class="diff-status" role="status">No remote resource exists for this mapping. Push the full local file to create it.</p>' : ''}` : `<form class="file-content-editor${isSpecFile ? ' spec-file-content-editor' : ''}" data-file-content-form${isSpecFile ? ' id="spec-file-content-form"' : ''}>${isSpecFile ? `<div class="spec-code-editor" data-spec-code-editor><div class="spec-code-gutter" data-code-gutter aria-hidden="true"></div><div class="spec-code-surface"><pre class="spec-code-highlight" data-code-highlight aria-hidden="true"></pre><textarea class="spec-code-input" name="fileContent" spellcheck="false" wrap="off" aria-label="Editable JSON specification">${escapeHtml(fileContent || '')}</textarea></div></div>` : `<textarea class="meta-json" name="fileContent" spellcheck="false" aria-label="File contents">${escapeHtml(fileContent || '')}</textarea><button class="terminal-run" type="submit">Save File</button>`}</form>`}
+                                            ${rootKind === 'assets' ? '' : '<p class="detail-feedback" data-meta-feedback aria-live="polite"></p>'}
+                                            ${isImageFile ? `<div class="image-file-preview"><img src="/${String(entry.path || '').split('/').map(encodeURIComponent).join('/')}" alt="Preview of ${escapeHtml(entry.name)}" decoding="async"/><a href="/${String(entry.path || '').split('/').map(encodeURIComponent).join('/')}" target="_blank" rel="noopener">Open image in new tab</a></div>` : rootKind === 'content' && entry.name.toLowerCase().endsWith('.json') ? `<div class="diff-viewer-host" data-diff-host></div>${remoteError ? `<p class="diff-error" role="status">${escapeHtml(remoteError)}</p>` : remoteExists === false ? '<p class="diff-status" role="status">No remote resource exists for this mapping. Push the full local file to create it.</p>' : ''}` : `<form class="file-content-editor${isSpecFile ? ' spec-file-content-editor' : ''}" data-file-content-form${isSpecFile ? ' id="spec-file-content-form"' : ''}>${isSpecFile ? `<div class="spec-code-editor" data-spec-code-editor><div class="spec-code-gutter" data-code-gutter aria-hidden="true"></div><div class="spec-code-surface"><pre class="spec-code-highlight" data-code-highlight aria-hidden="true"></pre><textarea class="spec-code-input" name="fileContent" spellcheck="false" wrap="off" aria-label="Editable JSON specification">${escapeHtml(fileContent || '')}</textarea></div></div>` : `<textarea class="meta-json" name="fileContent" spellcheck="false" aria-label="File contents">${escapeHtml(fileContent || '')}</textarea><button class="terminal-run" type="submit">Save File</button>`}</form>`}
                                         </main>
                                         ${contextSidebar}
                                     </div>
@@ -402,12 +476,12 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                                             <h3>Summary</h3>
                                             <p>${escapeHtml(entry.path || '')}</p>
                                             <span>${fileCount ?? 0} files · ${entries.filter((item) => item.type === 'directory').length} subfolders</span>
+                                            ${rootKind === 'specs' ? renderSpecFolderSummary() : ''}
                                         </section>
                                         <p class="detail-feedback" data-meta-feedback aria-live="polite"></p>
-                                        <div class="folder-detail-columns${rootKind === 'specs' ? ' specs-folder-columns' : ''}">
+                                        <div class="folder-detail-columns${rootKind === 'specs' ? ' specs-folder-columns' : rootKind === 'assets' ? ' assets-folder-columns' : ''}">
                                             <section class="folder-detail-column folder-local-column" aria-labelledby="folder-local-heading">
-                                                <header><h3 id="folder-local-heading">Local</h3>${actionBar}</header>
-                                                <div class="folder-entry-headings" aria-hidden="true"><span>Item</span><span>Local</span><span>Remote</span></div>
+                                                ${rootKind === 'content' ? `<header><h3 id="folder-local-heading">Local</h3></header><div class="folder-entry-headings" aria-hidden="true"><span>Item</span><span>Local</span><span>Modified</span><span>Remote</span><span>Modified</span></div>` : ''}
                                                 <div class="folder-entry-list" aria-label="Local folder contents">
                                                     ${folderEntries || '<p class="summary">This folder is empty.</p>'}
                                                 </div>
@@ -434,6 +508,13 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
         const directoryPane = mainContent.querySelector('#directory-list-pane')
         const detailsPane = mainContent.querySelector('#details-pane')
         const directorySplit = mainContent.querySelector('.directory-split')
+        directorySplit?.insertAdjacentHTML('beforebegin', `<nav class="explorer-tabbar" data-root-kind="${rootKind}" data-explorer-tabbar aria-label="Open files and folders"></nav><div class="explorer-toolbar" data-explorer-toolbar></div>`)
+        renderActionBar()
+        const initialEntry = metaSupport.selectedPath
+            ? entries.find((entry) => (path ? `${path}/${entry.name}` : entry.name) === metaSupport.selectedPath)
+            : folderSummary
+        if (initialEntry) updateExplorerTab({ ...initialEntry, path: metaSupport.selectedPath || path })
+        else renderTabStrip()
         directorySplit?.classList.toggle('folder-selected', !metaSupport.selectedPath)
 
         const openInEditor = async (targetPath) => {
@@ -453,7 +534,7 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
         const bindDetailForms = (entry, metaPayload, state = {}) => {
             const feedbackEl = detailsPane.querySelector('[data-meta-feedback]')
             const metaFileForm = detailsPane.querySelector('[data-meta-file-form]')
-            const metaJsonForm = detailsPane.querySelector('[data-meta-json-form]')
+            const metaSectionForms = detailsPane.querySelectorAll('[data-meta-section-form]')
             const fileContentForm = detailsPane.querySelector('[data-file-content-form]')
             const specCodeEditor = detailsPane.querySelector('[data-spec-code-editor]')
             if (specCodeEditor) {
@@ -512,6 +593,27 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                     button.disabled = false
                 }
             })
+            detailsPane.querySelector('[data-spec-folder-test]')?.addEventListener('click', async (event) => {
+                const button = event.currentTarget
+                button.disabled = true
+                const feedback = detailsPane.querySelector('[data-meta-feedback]')
+                if (feedback) feedback.textContent = `Testing ${activeSpecFiles.length} specifications…`
+                for (const spec of activeSpecFiles) {
+                    const command = `oa test --local ./${spec.cwdRelativePath}`
+                    try {
+                        const result = await onRunSpecCommand?.(command, spec.specPath)
+                        if (!result) throw new Error('The test did not return a result.')
+                    } catch (error) {
+                        const result = { code: 1, stdout: '', stderr: error?.message || 'Unable to run this specification test.' }
+                        specRunResults[spec.specPath] = { command, ...result, at: new Date().toISOString() }
+                        try { localStorage.setItem('oa.spec.lastRuns', JSON.stringify(specRunResults)) } catch { /* session-only if storage is unavailable */ }
+                    }
+                    const summary = detailsPane.querySelector('[data-spec-folder-summary]')
+                    if (summary) summary.outerHTML = renderSpecFolderSummary()
+                }
+                if (feedback) feedback.textContent = `Tested ${activeSpecFiles.length} specifications.`
+                button.disabled = false
+            })
             const commitFileForm = detailsPane.querySelector('[data-commit-file-form]')
             const contextTabList = detailsPane.querySelector('[data-context-tablist]')
             const contextTabButtons = [...(contextTabList?.querySelectorAll('[data-context-tab]') || [])]
@@ -561,17 +663,21 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                         return saved?.ok ? saved : { ok: false, error: saved?.error || 'Unable to save local file.' }
                     }
                 })
-                const languageControl = diffHost.querySelector('.diff-language-label')
-                const languageSlot = detailsPane.querySelector('[data-language-control-slot]')
-                if (languageControl && languageSlot) languageSlot.appendChild(languageControl)
+                const diffToolbar = diffHost.querySelector('.diff-toolbar')
+                const diffFooter = diffHost.querySelector('.diff-footer')
+                if (diffToolbar && diffFooter) diffFooter.prepend(diffToolbar)
             }
-            detailsPane.querySelectorAll('[data-viewer-action]').forEach((button) => button.addEventListener('click', () => {
+            mainContent.querySelectorAll('[data-viewer-action]').forEach((button) => button.addEventListener('click', () => {
                 if (button.dataset.viewerAction === 'sidebar') diffViewer?.toggleSidebar()
-                else if (button.dataset.viewerAction === 'focus') diffViewer?.toggleFocusMode()
                 else if (button.dataset.viewerAction === 'save') diffViewer?.save()
             }))
+            mainContent.querySelectorAll('[data-folder-sidebar-toggle]').forEach((button) => button.addEventListener('click', () => {
+                const visible = directorySplit?.classList.contains('folder-selected')
+                directorySplit?.classList.toggle('folder-selected', !visible)
+                button.setAttribute('aria-pressed', String(!visible))
+            }))
 
-            detailsPane.querySelectorAll('[data-sync-action]').forEach((button) => button.addEventListener('click', async () => {
+            mainContent.querySelectorAll('[data-sync-action]').forEach((button) => button.addEventListener('click', async () => {
                 const action = button.dataset.syncAction
                 const message = action === 'pull'
                     ? 'Pull the full remote file and replace the local file?'
@@ -623,7 +729,7 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                 const selected = String(formData.get('metaFile') || '')
                 const nextMeta = await metaSupport.loadMeta(entry.path, selected)
                 const diffRes = entry.type === 'file' && metaSupport.loadGitDiff ? await metaSupport.loadGitDiff(entry.path) : { diff: '' }
-                const currentFile = entry.type === 'file' && metaSupport.loadFileContent ? await metaSupport.loadFileContent(entry.path) : { ok: true, content: '' }
+                const currentFile = entry.type === 'file' && !isImagePath(entry.name) && metaSupport.loadFileContent ? await metaSupport.loadFileContent(entry.path) : { ok: true, content: '' }
                 const fileCount = entry.type === 'directory'
                     ? (entry.path === path ? folderSummary.fileCount : ((await metaSupport.loadEntries?.(entry.path)) || []).filter((item) => item.type === 'file').length)
                     : null
@@ -631,33 +737,50 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                 bindDetailForms(entry, nextMeta, { ...state, fileContent: currentFile?.content || '' })
             })
 
-            metaJsonForm?.addEventListener('submit', async (event) => {
+            metaSectionForms.forEach((metaSectionForm) => metaSectionForm.addEventListener('submit', async (event) => {
                 event.preventDefault()
                 if (!metaSupport.saveMeta || !metaSupport.loadMeta) return
-                const formData = new FormData(metaJsonForm)
-                const rawJson = String(formData.get('metaJson') || '{}').trim()
-                let parsedMeta
+                const formData = new FormData(metaSectionForm)
+                const rawJson = String(formData.get('metaSection') || '{}').trim()
+                let parsedSection
                 try {
-                    parsedMeta = rawJson ? JSON.parse(rawJson) : {}
+                    parsedSection = rawJson ? JSON.parse(rawJson) : {}
                 } catch {
-                    if (feedbackEl) feedbackEl.textContent = 'Meta JSON is invalid.'
+                    if (feedbackEl) feedbackEl.textContent = 'Metadata section JSON is invalid.'
                     return
                 }
+                if (!parsedSection || typeof parsedSection !== 'object') {
+                    if (feedbackEl) feedbackEl.textContent = 'A metadata section must be a JSON object or array.'
+                    return
+                }
+                const sectionKey = metaSectionForm.dataset.metaSection || '__attributes'
+                const mergedMeta = { ...(metaPayload?.meta || {}) }
+                if (sectionKey === '__attributes') {
+                    for (const [key, value] of Object.entries(mergedMeta)) if (!value || typeof value !== 'object' || Array.isArray(value)) delete mergedMeta[key]
+                    Object.assign(mergedMeta, parsedSection)
+                } else if (sectionKey === 'remotes.origin') {
+                    const remotes = { ...(mergedMeta.remotes || {}) }
+                    if (Object.keys(parsedSection).length) remotes.origin = parsedSection
+                    else delete remotes.origin
+                    if (Object.keys(remotes).length) mergedMeta.remotes = remotes
+                    else delete mergedMeta.remotes
+                } else if (Object.keys(parsedSection).length) mergedMeta[sectionKey] = parsedSection
+                else delete mergedMeta[sectionKey]
                 if (feedbackEl) feedbackEl.textContent = 'Saving meta...'
                 const saved = await metaSupport.saveMeta({
                     path: entry.path,
                     metaFile: metaPayload?.selectedMetaFile || 'meta.json',
-                    meta: parsedMeta
+                    meta: mergedMeta
                 })
                 const nextMeta = saved?.ok ? saved : await metaSupport.loadMeta(entry.path, metaPayload?.selectedMetaFile || '')
                 const diffRes = entry.type === 'file' && metaSupport.loadGitDiff ? await metaSupport.loadGitDiff(entry.path) : { diff: '' }
-                const currentFile = entry.type === 'file' && metaSupport.loadFileContent ? await metaSupport.loadFileContent(entry.path) : { ok: true, content: '' }
+                const currentFile = entry.type === 'file' && !isImagePath(entry.name) && metaSupport.loadFileContent ? await metaSupport.loadFileContent(entry.path) : { ok: true, content: '' }
                 const fileCount = entry.type === 'directory'
                     ? (entry.path === path ? folderSummary.fileCount : ((await metaSupport.loadEntries?.(entry.path)) || []).filter((item) => item.type === 'file').length)
                     : null
                 detailsPane.innerHTML = renderDetails(entry, nextMeta, diffRes.diff || '', fileCount, currentFile?.content || '', state.remoteContent || '', state.remoteError || '', state.remoteExists)
                 bindDetailForms(entry, nextMeta, { ...state, fileContent: currentFile?.content || '' })
-            })
+            }))
 
             fileContentForm?.addEventListener('submit', async (event) => {
                 event.preventDefault()
@@ -684,6 +807,7 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
 
         const selectEntry = async (entry) => {
             activeEntry = entry
+            updateExplorerTab(entry)
             activeContextTab = 'remote'
                 activeFolderContents = entry.type === 'directory' && entry.path !== path
                     ? ((await metaSupport.loadEntries?.(entry.path)) || [])
@@ -705,7 +829,7 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
             const diffRes = entry.type === 'file' && metaSupport.loadGitDiff
                 ? await metaSupport.loadGitDiff(entry.path)
                 : { diff: '' }
-            const fileContent = entry.type === 'file' && metaSupport.loadFileContent
+            const fileContent = entry.type === 'file' && !isImagePath(entry.name) && metaSupport.loadFileContent
                 ? await metaSupport.loadFileContent(entry.path)
                 : { ok: true, content: '' }
             const remoteResult = entry.type === 'file' && rootKind === 'content' && entry.name.toLowerCase().endsWith('.json') && metaSupport.loadRemoteFile
@@ -726,6 +850,58 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
         }
 
         mainContent.onclick = async (event) => {
+            const tabPin = event.target.closest('[data-tab-pin]')
+            if (tabPin) {
+                const tab = explorerTabs.find((item) => item.id === tabPin.dataset.tabPin)
+                if (tab) {
+                    tab.pinned = !tab.pinned
+                    saveExplorerTabs()
+                    renderTabStrip()
+                }
+                return
+            }
+
+            const tabClose = event.target.closest('[data-tab-close]')
+            if (tabClose) {
+                const index = explorerTabs.findIndex((item) => item.id === tabClose.dataset.tabClose)
+                if (index >= 0) {
+                    const [closed] = explorerTabs.splice(index, 1)
+                    if (closed.id === activeExplorerTab) {
+                        const next = explorerTabs[Math.max(0, index - 1)]
+                        activeExplorerTab = next?.id || ''
+                        if (next) await metaSupport.activateTab?.(next)
+                        else await metaSupport.activateTab?.({ path: closed.path.includes('/') ? closed.path.slice(0, closed.path.lastIndexOf('/')) : '', type: 'directory', section: closed.section })
+                    }
+                    saveExplorerTabs()
+                    renderTabStrip()
+                }
+                return
+            }
+
+            const tabSelect = event.target.closest('[data-tab-select]')
+            if (tabSelect) {
+                const tab = explorerTabs.find((item) => item.id === tabSelect.dataset.tabSelect)
+                if (tab) {
+                    activeExplorerTab = tab.id
+                    saveExplorerTabs()
+                    renderTabStrip()
+                    await metaSupport.activateTab?.(tab)
+                }
+                return
+            }
+
+            const tabAdd = event.target.closest('[data-tab-add]')
+            if (tabAdd) {
+                const tab = { id: `${rootKind}:${path}:new:${Date.now()}`, path, section: rootKind, type: 'directory', title: path.split('/').filter(Boolean).at(-1) || (rootKind === 'specs' ? '$specs' : rootKind === 'assets' ? 'assets' : '$content'), pinned: false }
+                explorerTabs.push(tab)
+                activeExplorerTab = tab.id
+                saveExplorerTabs()
+                renderTabStrip()
+                metaSupport.onSelectPath?.('')
+                await metaSupport.activateTab?.(tab)
+                return
+            }
+
             const addFile = event.target.closest('[data-add-file]')
             if (addFile) {
                 if (!metaSupport.createFile) return
@@ -751,6 +927,30 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                     const feedback = detailsPane.querySelector('[data-meta-feedback]')
                     if (feedback) feedback.textContent = error?.message || 'The file could not be created. Please try again.'
                     addFile.disabled = false
+                }
+                return
+            }
+
+            const addFolder = event.target.closest('[data-add-folder]')
+            if (addFolder) {
+                if (!metaSupport.createFolder) return
+                const name = window.prompt('Enter a folder name:')
+                if (!name?.trim()) return
+                addFolder.disabled = true
+                const directory = activeEntry.type === 'directory' ? activeEntry.path : path
+                try {
+                    const created = await metaSupport.createFolder({ directory, name: name.trim() })
+                    if (!created?.ok) {
+                        const feedback = detailsPane.querySelector('[data-meta-feedback]')
+                        if (feedback) feedback.textContent = created?.error || 'Unable to create folder.'
+                        addFolder.disabled = false
+                        return
+                    }
+                    if (metaSupport.refreshDirectory) await metaSupport.refreshDirectory()
+                } catch (error) {
+                    const feedback = detailsPane.querySelector('[data-meta-feedback]')
+                    if (feedback) feedback.textContent = error?.message || 'The folder could not be created. Please try again.'
+                    addFolder.disabled = false
                 }
                 return
             }

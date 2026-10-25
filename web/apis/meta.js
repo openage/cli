@@ -155,6 +155,7 @@ const getMetaPayload = ({ configFolder, targetPath, requestedMetaFile, resolveAp
         rootType: base.kind,
         targetPath: toPosix(targetPath),
         targetType,
+        targetModifiedAt: stat.mtime.toISOString(),
         metaFolder: toPosix(path.relative(file.path('$cwd'), metaFolder)),
         selectedMetaFile,
         availableMetaFiles,

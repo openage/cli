@@ -39,18 +39,12 @@ export const createDiffViewer = ({ host, path, localText, remoteText, onSave, on
     host.innerHTML = `
         <section class="diff-viewer" aria-label="File comparison">
           <div class="diff-toolbar" role="toolbar" aria-label="Comparison controls">
-            <button type="button" data-diff-action="previous" aria-label="Previous difference">Previous</button>
+            <button type="button" data-diff-action="previous" aria-label="Previous difference" title="Previous difference (Alt+↑)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 10 5-5 5 5"/></svg></button>
             <span class="diff-count" data-diff-count aria-live="polite"></span>
-            <button type="button" data-diff-action="next" aria-label="Next difference">Next</button>
-            <span class="diff-shortcuts">Alt+↑/↓ navigates changes</span>
-            <button type="button" data-diff-action="toggle-only" aria-pressed="false">Differences only</button>
-            <button type="button" data-diff-action="toggle-whitespace" aria-pressed="true">Ignore whitespace</button>
-            <button type="button" data-diff-action="toggle-view">Unified view</button>
-            <label class="diff-language-label">Language
-              <select data-diff-language aria-label="Syntax highlighting language">
-                <option value="auto">Auto</option><option value="json">JSON</option><option value="text">Plain text</option>
-              </select>
-            </label>
+            <button type="button" data-diff-action="next" aria-label="Next difference" title="Next difference (Alt+↓)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5"/></svg></button>
+            <button type="button" data-diff-action="toggle-only" aria-label="Differences only" title="Show differences only" aria-pressed="false"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3h10M3 8h4m3 0h3M3 13h10M8 6v4"/></svg></button>
+            <button type="button" data-diff-action="toggle-whitespace" aria-label="Ignore whitespace" title="Whitespace-only differences are ignored" aria-pressed="true"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h12M2 8h8M2 12h5"/><circle cx="12" cy="8" r=".7"/></svg></button>
+            <button type="button" data-diff-action="toggle-view" aria-label="Switch to unified view" title="Switch to unified view"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12v10H2zM8 3v10M4 6h2m4 0h2M4 10h2m4 0h2"/></svg></button>
           </div>
           <div class="diff-legend"><span class="diff-added-key">Remote change</span><span class="diff-removed-key">Local change</span><span data-diff-status aria-live="polite"></span></div>
           <div class="diff-columns ${viewMode === 'unified' ? 'is-unified' : ''}" data-diff-columns>
@@ -58,46 +52,30 @@ export const createDiffViewer = ({ host, path, localText, remoteText, onSave, on
             <div class="diff-pane diff-remote-pane"><header>Remote <span data-remote-count></span></header><div class="diff-scroll" data-side="remote" tabindex="0" aria-label="Read-only remote file comparison pane"></div></div>
           </div>
           <nav class="diff-minimap" aria-label="Difference overview" data-diff-minimap></nav>
+          <footer class="diff-footer"><label class="diff-language-label">Language
+            <select data-diff-language aria-label="Syntax highlighting language">
+              <option value="auto">Auto</option><option value="json">JSON</option><option value="text">Plain text</option>
+            </select>
+          </label></footer>
         </section>`
 
+    const toolbar = host.querySelector('.diff-toolbar')
     const columns = host.querySelector('[data-diff-columns]')
     const localPane = host.querySelector('[data-side="local"]')
     const remotePane = host.querySelector('[data-side="remote"]')
     const status = host.querySelector('[data-diff-status]')
     const detailView = host.closest('.file-detail-view')
-    const focusButton = detailView?.querySelector('[data-viewer-action="focus"]')
-    const sidebarButton = detailView?.querySelector('[data-viewer-action="sidebar"]')
-    let sidebarWasVisibleBeforeFocus = true
+    const actionsRoot = host.closest('#main-content') || detailView
+    const sidebarButton = actionsRoot?.querySelector('[data-viewer-action="sidebar"]')
 
     const setSidebarVisible = (visible) => {
         detailView?.classList.toggle('is-sidebar-hidden', !visible)
         if (!sidebarButton) return
         sidebarButton.setAttribute('aria-pressed', String(visible))
         sidebarButton.setAttribute('aria-label', visible ? 'Hide sidebar' : 'Show sidebar')
-        sidebarButton.textContent = visible ? 'Hide sidebar' : 'Show sidebar'
+        sidebarButton.title = visible ? 'Hide sidebar' : 'Show sidebar'
+        sidebarButton.dataset.tooltip = sidebarButton.title
     }
-
-    const setFocusMode = (enabled) => {
-        if (enabled) sidebarWasVisibleBeforeFocus = !detailView?.classList.contains('is-sidebar-hidden')
-        detailView?.classList.toggle('is-focus-mode', enabled)
-        setSidebarVisible(enabled ? false : sidebarWasVisibleBeforeFocus)
-        if (sidebarButton) sidebarButton.disabled = enabled
-        if (focusButton) {
-            focusButton.setAttribute('aria-pressed', String(enabled))
-            focusButton.setAttribute('aria-label', enabled ? 'Exit focus mode' : 'Enter focus mode')
-            focusButton.title = enabled ? 'Restore file details (Escape)' : 'Expand comparison; press Escape to exit'
-            focusButton.textContent = enabled ? 'Exit focus mode' : 'Focus mode'
-        }
-    }
-
-    const onDocumentKeydown = (event) => {
-        if (event.key === 'Escape' && detailView?.classList.contains('is-focus-mode')) {
-            event.preventDefault()
-            setFocusMode(false)
-            focusButton?.focus()
-        }
-    }
-    document.addEventListener('keydown', onDocumentKeydown)
 
     const compute = () => {
         requestId++
@@ -155,16 +133,17 @@ export const createDiffViewer = ({ host, path, localText, remoteText, onSave, on
         }
         paint(localPane, 'local')
         paint(remotePane, 'remote')
-        host.querySelector('[data-diff-count]').textContent = `${hunks.length ? activeHunk + 1 : 0} / ${hunks.length} changes`
+        toolbar.querySelector('[data-diff-count]').textContent = `${hunks.length ? activeHunk + 1 : 0} / ${hunks.length} changes`
         host.querySelector('[data-local-count]').textContent = `(${local.split('\n').length} lines)`
         host.querySelector('[data-remote-count]').textContent = `(${remote.split('\n').length} lines)`
         host.querySelector('[data-diff-minimap]').innerHTML = hunks.map((hunk, index) => `<button type="button" style="left:${rows.length ? (hunk.start / rows.length) * 100 : 0}%" data-minimap-hunk="${index}" aria-label="Go to difference ${index + 1}" title="Difference ${index + 1}"></button>`).join('') || '<span>No differences</span>'
-        host.querySelector('[data-diff-action="toggle-only"]').setAttribute('aria-pressed', String(differencesOnly))
-        const whitespaceButton = host.querySelector('[data-diff-action="toggle-whitespace"]')
+        toolbar.querySelector('[data-diff-action="toggle-only"]').setAttribute('aria-pressed', String(differencesOnly))
+        const whitespaceButton = toolbar.querySelector('[data-diff-action="toggle-whitespace"]')
         whitespaceButton.setAttribute('aria-pressed', String(ignoreWhitespace))
         whitespaceButton.title = ignoreWhitespace ? 'Whitespace-only differences are ignored' : 'Whitespace differences are shown'
-        const viewButton = host.querySelector('[data-diff-action="toggle-view"]')
-        viewButton.textContent = viewMode === 'side' ? 'Unified view' : 'Side-by-side view'
+        const viewButton = toolbar.querySelector('[data-diff-action="toggle-view"]')
+        viewButton.setAttribute('aria-label', viewMode === 'side' ? 'Switch to unified view' : 'Switch to side-by-side view')
+        viewButton.title = viewMode === 'side' ? 'Switch to unified view' : 'Switch to side-by-side view'
         viewButton.disabled = viewMode === 'unified' && window.matchMedia('(max-width: 900px)').matches
         columns.classList.toggle('is-unified', viewMode === 'unified')
     }
@@ -210,7 +189,7 @@ export const createDiffViewer = ({ host, path, localText, remoteText, onSave, on
         status.textContent = 'Remote line applied locally. Save to write the file.'
     }
 
-    host.addEventListener('click', (event) => {
+    toolbar.addEventListener('click', (event) => {
         const action = event.target.closest('[data-diff-action]')?.dataset.diffAction
         if (action === 'previous') scrollToHunk(activeHunk - 1)
         else if (action === 'next') scrollToHunk(activeHunk + 1)
@@ -293,13 +272,10 @@ export const createDiffViewer = ({ host, path, localText, remoteText, onSave, on
         setRemote(next) { remote = String(next ?? ''); compute() },
         getLocal() { return local },
         save,
-        toggleFocusMode() { setFocusMode(focusButton?.getAttribute('aria-pressed') !== 'true') },
         toggleSidebar() { setSidebarVisible(sidebarButton?.getAttribute('aria-pressed') !== 'true') },
         destroy() {
             clearTimeout(renderTimer)
             worker?.terminate()
-            document.removeEventListener('keydown', onDocumentKeydown)
-            detailView?.classList.remove('is-focus-mode')
             host.innerHTML = ''
         }
     }
