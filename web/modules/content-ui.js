@@ -12,9 +12,39 @@ const renderGitDiff = (source) => String(source || '').split(/\r?\n/).map((line)
     return `<span class="git-diff-line git-diff-line--${kind}">${escapeHtml(line) || '&nbsp;'}</span>`
 }).join('')
 
-export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUseCommand, onAddLocalPath, isPinned, onTogglePin }) => {
+export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUseCommand, onRunSpecCommand, onAddLocalPath, isPinned, onTogglePin }) => {
     const sectionTemplateCache = new Map()
     let settingsMeta = null
+    let specRunResults = {}
+    try { specRunResults = JSON.parse(localStorage.getItem('oa.spec.lastRuns') || '{}') } catch { /* ignore invalid saved results */ }
+
+    const normalizeSpecPath = (value) => String(value || '').replace(/\\/g, '/').replace(/^\$specs\//, '').replace(/^\.\/specs\//, '').replace(/^specs\//, '')
+    const specPathFromCommand = (command) => {
+        const match = String(command || '').match(/(?:\.\/)?specs[\\/]([^\s"']+\.json)/i)
+        return match ? normalizeSpecPath(match[1]) : ''
+    }
+
+    const renderSpecRunResult = (result) => {
+        if (!result) return '<p class="summary">No test run recorded yet. Run Test or Validate for this specification.</p>'
+        const passed = Number(result.code) === 0
+        const stripAnsi = (text) => String(text || '').replace(/\u001b(?:\[[0-?]*[ -/]*[@-~]|[@-Z\\-_])/g, '')
+        const stdout = stripAnsi(result.stdout).trim()
+        const stderr = stripAnsi(result.stderr).trim()
+        const outputLines = stdout.split(/\r?\n/)
+        const resultHeading = outputLines.findIndex((line) => /^\s*Result\s*$/i.test(line))
+        let resultTable = ''
+        let outputDetails = stdout
+        if (resultHeading >= 0) {
+            const parsedRows = outputLines.slice(resultHeading + 1).map((line) => line.trim()).filter((line) => /[|│]/.test(line)).map((line) => line.split(/[|│]/).slice(1, -1).map((cell) => cell.trim())).filter((cells) => cells.length >= 4 && cells.some(Boolean))
+            const headers = parsedRows.find((cells) => /^result$/i.test(cells[0]))
+            const rows = parsedRows.filter((cells) => cells !== headers && /(?:PASS|FAIL|UNKNOWN)/i.test(cells[0]))
+            if (headers && rows.length) {
+                resultTable = `<section class="spec-run-output spec-run-validations"><h4>Validation results</h4><div class="spec-run-table-wrap"><table><thead><tr>${headers.slice(0, 4).map((cell) => `<th>${escapeHtml(cell)}</th>`).join('')}</tr></thead><tbody>${rows.map((cells) => `<tr class="${/PASS/i.test(cells[0]) ? 'is-pass' : /FAIL/i.test(cells[0]) ? 'is-fail' : 'is-unknown'}">${cells.slice(0, 4).map((cell, index) => `<td>${index === 0 ? `<strong>${escapeHtml(cell)}</strong>` : escapeHtml(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></section>`
+                outputDetails = outputLines.slice(0, resultHeading).join('\n').trim()
+            }
+        }
+        return `<div class="spec-run-result ${passed ? 'is-success' : 'is-failure'}"><p><strong>${passed ? 'Passed' : 'Failed'}</strong><time>${escapeHtml(new Date(result.at).toLocaleString())}</time></p><div class="spec-run-command"><span>Command</span><code>${escapeHtml(result.command || '')}</code></div>${resultTable}${outputDetails ? `<section class="spec-run-output"><h4>${resultTable ? 'Response details' : 'Output'}</h4><pre>${escapeHtml(outputDetails)}</pre></section>` : ''}${stderr ? `<section class="spec-run-output spec-run-stderr"><h4>Error output</h4><pre>${escapeHtml(stderr)}</pre></section>` : ''}${!stdout && !stderr ? `<p class="summary">Command exited with code ${escapeHtml(result.code)}.</p>` : ''}</div>`
+    }
 
     const loadSettingsMeta = async () => {
         if (settingsMeta) return settingsMeta
@@ -219,7 +249,7 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
             ? metaSupport.payload
             : (isMetaEnabled && metaSupport.loadMeta ? await metaSupport.loadMeta(path || (rootKind === 'specs' ? '$specs' : '$content')) : null)
 
-        const renderDetails = (entry, metaPayload, diffText = '', fileCount = null, fileContent = '', remoteContent = '', remoteError = '') => {
+        const renderDetails = (entry, metaPayload, diffText = '', fileCount = null, fileContent = '', remoteContent = '', remoteError = '', remoteExists = null) => {
             const commands = getCommandsForEntry(entry)
             const isFile = entry.type === 'file'
             const isJsonFile = isFile && entry.name.toLowerCase().endsWith('.json')
@@ -228,8 +258,6 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                 ? `${remoteMapping.service}/${remoteMapping.collection}${remoteMapping.id ? `/${remoteMapping.id}` : ''}`
                 : ''
             const pinned = isJsonFile && isPinned?.(entry.path)
-            const schemaOptions = [...(metaPayload?.schemaOptions || []), ...(metaPayload?.schemaType ? [{ value: metaPayload.schemaType, label: metaPayload.schemaType }] : [])]
-                .filter((item, index, arr) => item?.value && arr.findIndex((other) => other?.value === item.value) === index)
             const isNavFile = entry.type === 'file' && (entry.path || '').includes('system/navs')
             const navUrl = metaPayload?.meta?.url || ''
             const context = window['oaContext'] || {}
@@ -242,17 +270,21 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                 : ''
 
             const hasChanges = isFile && (Boolean(diffText.trim()) || entry.gitStatus !== 'clean')
-            const actionBar = `
+            const isSpecFile = rootKind === 'specs' && isFile
+            const specPath = normalizeSpecPath(entry.path)
+            const specRunResult = specRunResults[specPath] || null
+            const actionBar = isSpecFile ? '' : `
                             <div class="file-context-bar">
                                 ${!isFile ? '<button type="button" class="copy-btn" data-add-file>Add File</button>' : ''}
-                                ${!isFile || rootKind === 'specs' ? `<button type="button" class="copy-btn" data-run-command="${escapeHtml(commands.primary)}">${rootKind === 'specs' ? 'Test' : 'Pull'}</button>
-                                <button type="button" class="copy-btn" data-run-command="${escapeHtml(commands.secondary)}">${rootKind === 'specs' ? 'Validate' : 'Push'}</button>` : ''}
-                                ${isFile && rootKind === 'content' && entry.name.toLowerCase().endsWith('.json') && !remoteError ? `<button type="button" class="copy-btn" data-sync-action="pull">Pull full remote file</button><button type="button" class="copy-btn" data-sync-action="push">Push full local file</button>` : ''}
-                                ${isFile ? `<button type="button" class="copy-btn" data-run-command="${escapeHtml(`oa test${entry.cwdRelativePath ? ` --local ./${entry.cwdRelativePath}` : ''}`)}">Validate Schema</button>` : ''}
-                                ${isFile ? `<button type="button" class="copy-btn" data-open-vscode="${escapeHtml(entry.path)}">Open In Editor</button>` : `<button type="button" class="copy-btn" data-open-path="${escapeHtml(entry.path)}">Open Folder</button>`}
-                                ${isJsonFile ? `<button type="button" class="copy-btn ${pinned ? 'is-pinned' : ''}" data-toggle-pin="${escapeHtml(entry.path)}">${pinned ? 'Unpin' : 'Pin'}</button>` : ''}
-                                <button type="button" class="copy-btn" data-copy-webpath="${escapeHtml(entry.webPath || '')}">Copy Web URL</button>
-                                ${pageUrl ? `<a href="${escapeHtml(pageUrl)}" target="_blank" class="copy-btn">View Page</a>` : ''}
+                                ${!isFile ? `<button type="button" class="copy-btn" data-run-command="${escapeHtml(commands.primary)}">${rootKind === 'specs' ? 'Test' : 'Pull'}</button>
+                                <button type="button" class="copy-btn" data-run-command="${escapeHtml(commands.secondary)}">${rootKind === 'specs' ? 'Validate' : 'Push'}</button>` : rootKind === 'specs' ? `<button type="button" class="copy-btn" data-run-command="${escapeHtml(commands.secondary)}">Validate</button>` : ''}
+                                ${isFile && rootKind === 'content' && entry.name.toLowerCase().endsWith('.json') && remoteExists === true ? `<button type="button" class="copy-btn" data-sync-action="pull">Pull full remote file</button>` : ''}
+                                ${isFile && rootKind === 'content' && entry.name.toLowerCase().endsWith('.json') && remoteExists === false ? `<button type="button" class="copy-btn" data-sync-action="push">Push full local file</button>` : ''}
+                                ${isFile && !isSpecFile ? `<button type="button" class="copy-btn" data-run-command="${escapeHtml(`oa test${entry.cwdRelativePath ? ` --local ./${entry.cwdRelativePath}` : ''}`)}">Validate Schema</button>` : ''}
+                                ${isFile && !isSpecFile ? `<button type="button" class="copy-btn" data-open-vscode="${escapeHtml(entry.path)}">Open In Editor</button>` : !isFile ? `<button type="button" class="copy-btn" data-open-path="${escapeHtml(entry.path)}">Open Folder</button>` : ''}
+                                ${isJsonFile && !isSpecFile ? `<button type="button" class="copy-btn ${pinned ? 'is-pinned' : ''}" data-toggle-pin="${escapeHtml(entry.path)}">${pinned ? 'Unpin' : 'Pin'}</button>` : ''}
+                                ${!isSpecFile ? `<button type="button" class="copy-btn" data-copy-webpath="${escapeHtml(entry.webPath || '')}">Copy Web URL</button>` : ''}
+                                ${!isSpecFile && pageUrl ? `<a href="${escapeHtml(pageUrl)}" target="_blank" class="copy-btn">View Page</a>` : ''}
                             </div>
                         `
             const remotePanel = `
@@ -270,20 +302,15 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                                 </form>
                                 <form class="meta-form meta-form-stack" data-meta-json-form>
                                     <textarea class="meta-json" name="metaJson" spellcheck="false" aria-label="Remote metadata JSON">${escapeHtml(JSON.stringify(metaPayload?.meta || {}, null, 2))}</textarea>
-                                    <button class="terminal-run" type="submit">Save Remote Metadata</button>
+                                    <button class="terminal-run" type="submit">Save</button>
                                 </form>
                             </section>
                         `
             const schemaPanel = isFile ? `
                             <section class="detail-section">
                                 <h3>Schema</h3>
-                                <form class="meta-form" data-meta-schema-form>
-                                    <select class="terminal-input" name="schemaType" aria-label="Schema type">
-                                        <option value="">(none)</option>
-                                        ${schemaOptions.map((item) => `<option value="${escapeHtml(item.value)}" ${item.value === metaPayload?.schemaType ? 'selected' : ''}>${escapeHtml(item.label || item.value)}</option>`).join('')}
-                                    </select>
-                                    <button class="terminal-run" type="submit">Save</button>
-                                </form>
+                                <p class="summary">${metaPayload?.schemaEndpoint ? `Endpoint: <code>${escapeHtml(metaPayload.schemaEndpoint)}</code>` : 'No endpoint mapping available.'}</p>
+                                <p class="summary">${metaPayload?.schemaFile ? `Schema: <code>${escapeHtml(metaPayload.schemaFile)}</code>` : ''}</p>
                                 <div class="schema-language-slot" data-language-control-slot></div>
                                 <pre class="terminal-output config-output schema-preview">${escapeHtml(JSON.stringify(metaPayload?.schema || {}, null, 2))}</pre>
                             </section>
@@ -321,11 +348,13 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                     : ''
                 return `<${canOpen ? 'button' : 'div'} class="folder-entry-row${canOpen ? ' is-openable' : ' is-remote-only'}" ${attrs}>${content}</${canOpen ? 'button' : 'div'}>`
             }).join('') : ''
-            const contextPanels = [
-                { key: 'remote', label: 'Remote', content: remotePanel },
-                ...(isFile ? [{ key: 'schema', label: 'Schema', content: schemaPanel }] : []),
-                ...(hasChanges ? [{ key: 'changes', label: 'Uncommitted Changes', content: changesPanel }] : [])
-            ]
+            const contextPanels = rootKind === 'specs'
+                ? [{ key: 'last-run', label: 'Last run', content: `<section class="detail-section"><h3>Last run result</h3><div data-spec-last-run data-spec-path="${escapeHtml(specPath)}">${renderSpecRunResult(specRunResult)}</div></section>` }]
+                : [
+                    { key: 'remote', label: 'Remote', content: remotePanel },
+                    ...(isFile ? [{ key: 'schema', label: 'Schema', content: schemaPanel }] : []),
+                    ...(hasChanges ? [{ key: 'changes', label: 'Uncommitted Changes', content: changesPanel }] : [])
+                ]
             const contextSidebar = `
                 <aside class="file-detail-sidebar">
                     <div class="file-context-tabs" data-context-tabs>
@@ -341,9 +370,16 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                             <section class="file-detail-view" id="details-card">
                                 <header class="file-detail-title">
                                     <div class="file-detail-heading">
-                                        <span class="file-icon">${isFile ? escapeHtml(getFileIcon(entry.name)) : 'DIR'}</span>
+                                        <span class="file-icon"${rootKind === 'specs' && isFile ? ' aria-label="Test specification" title="Test specification"' : ''}>${rootKind === 'specs' && isFile ? '⚗' : isFile ? escapeHtml(getFileIcon(entry.name)) : 'DIR'}</span>
                                         <div><h2>${escapeHtml(entry.name || '')}</h2><p>${escapeHtml(entry.path || '')}</p></div>
                                     </div>
+                                    ${isSpecFile ? `<div class="file-detail-header-actions spec-header-actions" role="toolbar" aria-label="Specification actions">
+                                        <button type="button" class="copy-btn" data-spec-test="${escapeHtml(commands.primary)}" data-spec-path="${escapeHtml(specPath)}">Test</button>
+                                        <button type="button" class="copy-btn" data-run-command="${escapeHtml(commands.secondary)}">Validate</button>
+                                        <button type="button" class="copy-btn" data-open-vscode="${escapeHtml(entry.path)}">Open In Editor</button>
+                                        <button type="submit" form="spec-file-content-form" class="copy-btn spec-save-button">Save</button>
+                                        <button type="button" class="copy-btn ${pinned ? 'is-pinned' : ''}" data-toggle-pin="${escapeHtml(entry.path)}">${pinned ? 'Unpin' : 'Pin'}</button>
+                                    </div>` : ''}
                                     ${isJsonFile && rootKind === 'content' ? `<div class="file-detail-header-actions" role="toolbar" aria-label="Comparison actions">
                                         <button type="button" class="copy-btn" data-viewer-action="sidebar" aria-pressed="true">Hide sidebar</button>
                                         <button type="button" class="copy-btn" data-viewer-action="focus" aria-pressed="false" title="Expand comparison; press Escape to exit">Focus mode</button>
@@ -356,7 +392,7 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                                         <main class="file-detail-main">
                                             ${actionBar}
                                             <p class="detail-feedback" data-meta-feedback aria-live="polite"></p>
-                                            ${rootKind === 'content' && entry.name.toLowerCase().endsWith('.json') ? `<div class="diff-viewer-host" data-diff-host></div>${remoteError ? `<p class="diff-error" role="status">${escapeHtml(remoteError)}</p>` : ''}` : `<form class="file-content-editor" data-file-content-form><textarea class="meta-json" name="fileContent" spellcheck="false" aria-label="File contents">${escapeHtml(fileContent || '')}</textarea><button class="terminal-run" type="submit">Save File</button></form>`}
+                                            ${rootKind === 'content' && entry.name.toLowerCase().endsWith('.json') ? `<div class="diff-viewer-host" data-diff-host></div>${remoteError ? `<p class="diff-error" role="status">${escapeHtml(remoteError)}</p>` : remoteExists === false ? '<p class="diff-status" role="status">No remote resource exists for this mapping. Push the full local file to create it.</p>' : ''}` : `<form class="file-content-editor${isSpecFile ? ' spec-file-content-editor' : ''}" data-file-content-form${isSpecFile ? ' id="spec-file-content-form"' : ''}>${isSpecFile ? `<div class="spec-code-editor" data-spec-code-editor><div class="spec-code-gutter" data-code-gutter aria-hidden="true"></div><div class="spec-code-surface"><pre class="spec-code-highlight" data-code-highlight aria-hidden="true"></pre><textarea class="spec-code-input" name="fileContent" spellcheck="false" wrap="off" aria-label="Editable JSON specification">${escapeHtml(fileContent || '')}</textarea></div></div>` : `<textarea class="meta-json" name="fileContent" spellcheck="false" aria-label="File contents">${escapeHtml(fileContent || '')}</textarea><button class="terminal-run" type="submit">Save File</button>`}</form>`}
                                         </main>
                                         ${contextSidebar}
                                     </div>
@@ -368,7 +404,7 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                                             <span>${fileCount ?? 0} files · ${entries.filter((item) => item.type === 'directory').length} subfolders</span>
                                         </section>
                                         <p class="detail-feedback" data-meta-feedback aria-live="polite"></p>
-                                        <div class="folder-detail-columns">
+                                        <div class="folder-detail-columns${rootKind === 'specs' ? ' specs-folder-columns' : ''}">
                                             <section class="folder-detail-column folder-local-column" aria-labelledby="folder-local-heading">
                                                 <header><h3 id="folder-local-heading">Local</h3>${actionBar}</header>
                                                 <div class="folder-entry-headings" aria-hidden="true"><span>Item</span><span>Local</span><span>Remote</span></div>
@@ -376,11 +412,11 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                                                     ${folderEntries || '<p class="summary">This folder is empty.</p>'}
                                                 </div>
                                             </section>
-                                            <section class="folder-detail-column folder-remote-column" aria-labelledby="folder-remote-heading">
+                                            ${rootKind === 'content' ? `<section class="folder-detail-column folder-remote-column" aria-labelledby="folder-remote-heading">
                                                 <h3 id="folder-remote-heading">Remote</h3>
                                                 ${activeRemoteListing?.remoteAvailable ? `<p class="folder-remote-refresh" role="status">Refreshed ${escapeHtml(new Date(activeRemoteListing.fetchedAt).toLocaleTimeString())}</p>` : `<p class="folder-remote-refresh" role="status">${escapeHtml(activeRemoteListing?.error || 'Remote listing unavailable. Mapped file metadata is shown where available.')}</p>`}
                                                 ${remotePanel}
-                                            </section>
+                                            </section>` : ''}
                                         </div>
                                     </main>
                                 `}
@@ -417,9 +453,65 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
         const bindDetailForms = (entry, metaPayload, state = {}) => {
             const feedbackEl = detailsPane.querySelector('[data-meta-feedback]')
             const metaFileForm = detailsPane.querySelector('[data-meta-file-form]')
-            const schemaForm = detailsPane.querySelector('[data-meta-schema-form]')
             const metaJsonForm = detailsPane.querySelector('[data-meta-json-form]')
             const fileContentForm = detailsPane.querySelector('[data-file-content-form]')
+            const specCodeEditor = detailsPane.querySelector('[data-spec-code-editor]')
+            if (specCodeEditor) {
+                const input = specCodeEditor.querySelector('.spec-code-input')
+                const highlight = specCodeEditor.querySelector('[data-code-highlight]')
+                const gutter = specCodeEditor.querySelector('[data-code-gutter]')
+                const paint = () => {
+                    const source = input.value
+                    const tokens = /"(?:\\.|[^"\\])*"(?=\s*:)|"(?:\\.|[^"\\])*"|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|\b(?:true|false|null)\b|[{}\[\],:]/g
+                    let cursor = 0
+                    let markup = ''
+                    for (const match of source.matchAll(tokens)) {
+                        const token = match[0]
+                        const start = match.index
+                        markup += escapeHtml(source.slice(cursor, start))
+                        const type = token.startsWith('"') ? (/^\s*:/.test(source.slice(start + token.length)) ? 'property' : 'string')
+                            : /^(true|false|null)$/.test(token) ? 'literal'
+                                : /^[{}\[\],:]$/.test(token) ? 'punctuation' : 'number'
+                        markup += `<span class="spec-token-${type}">${escapeHtml(token)}</span>`
+                        cursor = start + token.length
+                    }
+                    markup += escapeHtml(source.slice(cursor))
+                    highlight.innerHTML = `${markup}${source.endsWith('\n') ? ' ' : ''}`
+                    gutter.textContent = Array.from({ length: source.split('\n').length }, (_, index) => String(index + 1)).join('\n')
+                    highlight.style.transform = `translate(${-input.scrollLeft}px, ${-input.scrollTop}px)`
+                    gutter.style.transform = `translateY(${-input.scrollTop}px)`
+                }
+                input.addEventListener('input', paint)
+                input.addEventListener('scroll', paint)
+                input.addEventListener('keydown', (event) => {
+                    if (event.key !== 'Tab') return
+                    event.preventDefault()
+                    const start = input.selectionStart
+                    const end = input.selectionEnd
+                    input.setRangeText('  ', start, end, 'end')
+                    input.dispatchEvent(new Event('input', { bubbles: true }))
+                })
+                paint()
+            }
+            detailsPane.querySelector('[data-spec-test]')?.addEventListener('click', async (event) => {
+                const button = event.currentTarget
+                const command = button.dataset.specTest || ''
+                button.disabled = true
+                try {
+                    const result = await onRunSpecCommand?.(command, button.dataset.specPath || entry.path)
+                    if (!result) throw new Error('Unable to run this specification test.')
+                } catch (error) {
+                    const result = { code: 1, stdout: '', stderr: error.message || 'Unable to run this specification test.' }
+                    const specRunResult = { command, ...result, at: new Date().toISOString() }
+                    const specPath = normalizeSpecPath(button.dataset.specPath || entry.path)
+                    specRunResults[specPath] = specRunResult
+                    try { localStorage.setItem('oa.spec.lastRuns', JSON.stringify(specRunResults)) } catch { /* session-only if storage is unavailable */ }
+                    const resultPanel = mainContent.querySelector('[data-spec-last-run]')
+                    if (resultPanel?.dataset.specPath === specPath) resultPanel.innerHTML = renderSpecRunResult(specRunResult)
+                } finally {
+                    button.disabled = false
+                }
+            })
             const commitFileForm = detailsPane.querySelector('[data-commit-file-form]')
             const contextTabList = detailsPane.querySelector('[data-context-tablist]')
             const contextTabButtons = [...(contextTabList?.querySelectorAll('[data-context-tab]') || [])]
@@ -535,28 +627,7 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                 const fileCount = entry.type === 'directory'
                     ? (entry.path === path ? folderSummary.fileCount : ((await metaSupport.loadEntries?.(entry.path)) || []).filter((item) => item.type === 'file').length)
                     : null
-                detailsPane.innerHTML = renderDetails(entry, nextMeta, diffRes.diff || '', fileCount, currentFile?.content || '', state.remoteContent || '', state.remoteError || '')
-                bindDetailForms(entry, nextMeta, { ...state, fileContent: currentFile?.content || '' })
-            })
-
-            schemaForm?.addEventListener('submit', async (event) => {
-                event.preventDefault()
-                if (!metaSupport.saveMeta || !metaSupport.loadMeta) return
-                const formData = new FormData(schemaForm)
-                const schemaType = String(formData.get('schemaType') || '')
-                if (feedbackEl) feedbackEl.textContent = 'Saving schema type...'
-                const saved = await metaSupport.saveMeta({
-                    path: entry.path,
-                    metaFile: metaPayload?.selectedMetaFile || 'meta.json',
-                    schemaType
-                })
-                const nextMeta = saved?.ok ? saved : await metaSupport.loadMeta(entry.path, metaPayload?.selectedMetaFile || '')
-                const diffRes = entry.type === 'file' && metaSupport.loadGitDiff ? await metaSupport.loadGitDiff(entry.path) : { diff: '' }
-                const currentFile = entry.type === 'file' && metaSupport.loadFileContent ? await metaSupport.loadFileContent(entry.path) : { ok: true, content: '' }
-                const fileCount = entry.type === 'directory'
-                    ? (entry.path === path ? folderSummary.fileCount : ((await metaSupport.loadEntries?.(entry.path)) || []).filter((item) => item.type === 'file').length)
-                    : null
-                detailsPane.innerHTML = renderDetails(entry, nextMeta, diffRes.diff || '', fileCount, currentFile?.content || '', state.remoteContent || '', state.remoteError || '')
+                detailsPane.innerHTML = renderDetails(entry, nextMeta, diffRes.diff || '', fileCount, currentFile?.content || '', state.remoteContent || '', state.remoteError || '', state.remoteExists)
                 bindDetailForms(entry, nextMeta, { ...state, fileContent: currentFile?.content || '' })
             })
 
@@ -584,7 +655,7 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                 const fileCount = entry.type === 'directory'
                     ? (entry.path === path ? folderSummary.fileCount : ((await metaSupport.loadEntries?.(entry.path)) || []).filter((item) => item.type === 'file').length)
                     : null
-                detailsPane.innerHTML = renderDetails(entry, nextMeta, diffRes.diff || '', fileCount, currentFile?.content || '', state.remoteContent || '', state.remoteError || '')
+                detailsPane.innerHTML = renderDetails(entry, nextMeta, diffRes.diff || '', fileCount, currentFile?.content || '', state.remoteContent || '', state.remoteError || '', state.remoteExists)
                 bindDetailForms(entry, nextMeta, { ...state, fileContent: currentFile?.content || '' })
             })
 
@@ -606,7 +677,7 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
                     ? (entry.path === path ? folderSummary.fileCount : ((await metaSupport.loadEntries?.(entry.path)) || []).filter((item) => item.type === 'file').length)
                     : null
                 if (feedbackEl) feedbackEl.textContent = 'File saved.'
-                detailsPane.innerHTML = renderDetails(entry, nextMeta || {}, diffRes.diff || '', fileCount, currentFile?.content || '', state.remoteContent || '', state.remoteError || '')
+                detailsPane.innerHTML = renderDetails(entry, nextMeta || {}, diffRes.diff || '', fileCount, currentFile?.content || '', state.remoteContent || '', state.remoteError || '', state.remoteExists)
                 bindDetailForms(entry, nextMeta || {}, { ...state, fileContent: currentFile?.content || '' })
             })
         }
@@ -643,13 +714,14 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
             const comparisonState = {
                 fileContent: fileContent?.content || '',
                 remoteContent: remoteResult?.ok ? remoteResult.content : '',
-                remoteError: remoteResult && !remoteResult.ok ? remoteResult.error || 'Remote comparison is unavailable.' : ''
+                remoteError: remoteResult && !remoteResult.ok ? remoteResult.error || 'Remote comparison is unavailable.' : '',
+                remoteExists: remoteResult?.ok ? remoteResult.exists !== false : null
             }
             const fileCount = entry.type === 'directory'
                 ? activeFolderContents.filter((item) => item.type === 'file').length
                 : null
 
-            detailsPane.innerHTML = renderDetails(entry, metaPayload || {}, diffRes.diff || '', fileCount, fileContent?.content || '', comparisonState.remoteContent, comparisonState.remoteError)
+            detailsPane.innerHTML = renderDetails(entry, metaPayload || {}, diffRes.diff || '', fileCount, fileContent?.content || '', comparisonState.remoteContent, comparisonState.remoteError, comparisonState.remoteExists)
             bindDetailForms(entry, metaPayload || {}, comparisonState)
         }
 
@@ -1192,6 +1264,16 @@ export const createContentUi = ({ mainContent, cardCommands, commandIcons, onUse
     return {
         renderHome,
         renderDirectoryContent,
+        recordSpecRunResult: (command, result, selectedSpecPath = '') => {
+            if (!/^\s*oa\s+test\b/i.test(String(command || ''))) return
+            const specPath = normalizeSpecPath(selectedSpecPath || specPathFromCommand(command))
+            if (!specPath) return
+            const specRunResult = { command: String(command), ...result, at: new Date().toISOString() }
+            specRunResults[specPath] = specRunResult
+            try { localStorage.setItem('oa.spec.lastRuns', JSON.stringify(specRunResults)) } catch { /* session-only if storage is unavailable */ }
+            const resultPanel = mainContent.querySelector('[data-spec-last-run]')
+            if (resultPanel?.dataset.specPath === specPath) resultPanel.innerHTML = renderSpecRunResult(specRunResult)
+        },
         renderConfig,
         renderHelp,
         renderChangelog,

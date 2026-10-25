@@ -16,6 +16,14 @@ export const commands = [
         examples: ['oa push', 'oa push --local ./data', 'oa push --remote system://target']
     },
     {
+        name: 'monit',
+        title: 'monit',
+        overview: 'Poll a required local folder and its remote mappings; safely queue validated full-file pushes and report conflicts.',
+        keyConcepts: ['Polling', 'Schema validation', 'Conflict review', 'Explicit new-file approval'],
+        options: ['<folder>', '--approve <file>'],
+        examples: ['oa monit data/system/applications', 'oa monit data/system/applications --approve data/system/applications/test.json']
+    },
+    {
         name: 'script',
         title: 'script',
         overview: 'Execute scripted sequences of OA actions stored as JSON scripts.',

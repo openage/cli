@@ -25,13 +25,20 @@
         <ul class="content-list help-list">
             <li><code>oa pull [path]</code>: Fetch data from remote services to your local workspace.</li>
             <li><code>oa push [path]</code>: Send local modifications back to the remote service.</li>
+            <li><code>oa monit &lt;folder&gt;</code>: Poll a required folder for local and remote JSON changes. Safe remote-only changes are pulled; schema-valid local-only changes are queued and pushed as whole files. Conflicts are saved in file metadata and linked to the web conflict list. New local files always require explicit approval with <code>--approve &lt;file&gt;</code>.</li>
             <li><code>oa test [path]</code>: Run JSON-based test specifications with full request/response validation.</li>
             <li><code>oa init</code>: Bootstrap a new project structure, initialize Git, and provision remote application settings.</li>
-            <li><code>oa validate [path]</code>: Verify JSON files against their schemas (Draft 2020-12) with support for <code>$ref</code> and automated folder mapping.</li>
+            <li><code>oa validate [path]</code>: Verify JSON files against their schemas (Draft 2020-12) using <code>.oa/schemas/&lt;service&gt;.&lt;collection&gt;.schema.json</code> and supporting <code>$ref</code>.</li>
             <li><code>oa config [key] [value]</code>: View or update CLI settings (e.g., <code>oa config logger.level debug</code>).</li>
             <li><code>oa remote [file] [url]</code>: Map a local file to a remote resource URL for easy syncing.</li>
             <li><code>oa serve</code>: Start this interactive web documentation server locally.</li>
+            <li>Monitor cadence is configured in minutes with <code>oa config monit.pullIntervalMinutes 5</code> and <code>oa config monit.pushIntervalMinutes 5</code>. Both default to five minutes. Run <code>oa serve</code> to open conflict links in the web UI.</li>
         </ul>
+        <div class="example-box">
+            <p><strong>Monitor behavior:</strong> The first scan runs immediately. If a file has no saved baseline, the monitor pulls the complete remote file and saves it as the baseline. Remote-only changes also pull the full JSON file; local-only changes are schema-validated and queued for full-file push; divergent edits after a baseline exists create unresolved metadata conflicts. New files are held for explicit approval and are never auto-pushed. Click <strong>Monitor Logs</strong> in the activity toolbar to search logs by date, file, operation, error type, or message. Daily JSON-lines logs are flat files directly under <code>.logs</code>, with path components joined by <code>__</code>. The monitor checks for local edits before writes and never locks a file. Missing endpoint schemas block pushes. The remote transport currently has no conditional-write support, so a remote update can still race the final check.</p>
+            <p><strong>Approve one new file:</strong></p>
+            <code>oa monit data/system/applications --approve data/system/applications/test.json</code>
+        </div>
         <div class="example-box">
             <p><strong>Project Lifecycle:</strong></p>
             <code>oa init</code>
@@ -49,8 +56,8 @@
                 <p><code>oa init</code> sets up your directory structure, secret keys, and Git state. It also offers to provision your application on the remote server interactively.</p>
             </div>
             <div class="concept-item">
-                <h4>Self-Healing Index</h4>
-                <p>When you validate a file in a new folder, OA asks which schema to use and remembers it. This self-healing behavior automates your schema mapping as you build.</p>
+                <h4>Endpoint Schema Resolution</h4>
+                <p>Schema validation resolves the endpoint from file metadata or the <code>data/&lt;service&gt;/&lt;collection&gt;</code> path and loads the corresponding schema from <code>.oa/schemas/</code>.</p>
             </div>
             <div class="concept-item">
                 <h4>$prefixes</h4>

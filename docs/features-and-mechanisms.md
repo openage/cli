@@ -10,6 +10,7 @@ This is the feature index for the OA CLI. Each page focuses on one feature and e
 | [Configuration](./features/configuration.md) | How persistent settings, environment overrides, and encrypted values work. |
 | [Workflow data](./features/workflow-data.md) | How named JSON stores supply reusable workflow values. |
 | [Remote pull and push](./features/remote-pull-and-push.md) | How records move between HTTP services and local content files. |
+| [Monit](./features/monit.md) | Poll mapped JSON files, validate queued pushes, pull safe remote changes, and review conflicts. |
 | [Local-to-remote metadata](./features/local-remote-metadata.md) | How local content paths are mapped to remote resources. |
 | [Transformations and templates](./features/transformations-and-templates.md) | How data is transformed and dynamic values are injected. |
 | [API test specifications](./features/api-test-specifications.md) | How JSON specs issue requests and validate responses. |

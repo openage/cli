@@ -43,9 +43,18 @@ let currentGitSummary = {}
 let currentContextData = { role: '', application: '', organization: '', session: { remainingMs: null } }
 let isTerminalVisible = true
 let hasInitializedRoute = false
+let currentMonitView = ''
+let currentLogFilters = { date: '', file: '', operation: '', errorType: '', search: '', page: 0 }
+let monitorAutoRefreshEnabled = false
+let monitorRefreshTimer = null
+let logsAutoRefreshEnabled = false
+let logRefreshTimer = null
+try { monitorAutoRefreshEnabled = localStorage.getItem('oa.monitor.autoRefresh') === 'true' } catch { /* use the default */ }
+try { logsAutoRefreshEnabled = localStorage.getItem('oa.logs.autoRefresh') === 'true' } catch { /* use the default */ }
 let isRestoringHistory = false
 let pinnedPaths = []
 let currentConfigPayload = { data: {} }
+let contentUi = null
 const expandedTreePaths = new Set()
 const initializedTreeRoots = new Set()
 
@@ -67,12 +76,13 @@ const syncActivityBar = () => {
     })
 }
 
-const cardCommands = commands.filter((cmd) => ['init', 'validate', 'pull', 'push', 'script', 'config', 'context', 'test'].includes(cmd.name))
+const cardCommands = commands.filter((cmd) => ['init', 'validate', 'pull', 'push', 'monit', 'script', 'config', 'context', 'test'].includes(cmd.name))
 const commandIcons = {
     init: '\u26A1',
     validate: '\u2611',
     pull: '\u2B07',
     push: '\u2B06',
+    monit: '\uD83D\uDD04',
     script: '\u2699',
     config: '\u2692',
     context: '\u25C9',
@@ -85,6 +95,80 @@ const escapeHtml = (value) => String(value ?? '')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;')
+
+const renderMonitLogs = async (filters = currentLogFilters) => {
+    if (logRefreshTimer) clearTimeout(logRefreshTimer)
+    logRefreshTimer = null
+    currentLogFilters = { ...currentLogFilters, ...filters }
+    const activeFilters = { ...currentLogFilters }
+    const query = new URLSearchParams({ page: String(activeFilters.page || 0), pageSize: '100' })
+    for (const key of ['date', 'file', 'operation', 'errorType', 'search']) {
+        if (activeFilters[key]) query.set(key, activeFilters[key])
+    }
+    mainContent.innerHTML = '<section class="card monit-log-view"><h1>Logs</h1><p class="summary">Loading workspace operation logs…</p></section>'
+    try {
+        const response = await fetch(`/api/monit/logs?${query.toString()}`)
+        const payload = await response.json()
+        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Unable to load monitor logs.')
+        const selectOptions = (values, selected, label) => `<option value="">All ${label}</option>${values.map((value) => `<option value="${escapeHtml(value)}" ${value === selected ? 'selected' : ''}>${escapeHtml(value)}</option>`).join('')}`
+        const rows = (payload.entries || []).map((entry) => {
+            const detailText = JSON.stringify(entry, null, 2)
+            const timestamp = entry.at || entry.date
+            const timestampDate = new Date(timestamp)
+            const absoluteTime = Number.isNaN(timestampDate.getTime()) ? String(timestamp || '') : timestampDate.toLocaleString()
+            const elapsedSeconds = Number.isNaN(timestampDate.getTime()) ? null : Math.max(0, Math.floor((Date.now() - timestampDate.getTime()) / 1000))
+            const relativeTime = elapsedSeconds == null ? String(timestamp || '')
+                : elapsedSeconds < 10 ? 'just now'
+                    : elapsedSeconds < 60 ? `${elapsedSeconds} seconds ago`
+                        : elapsedSeconds < 3600 ? `${Math.floor(elapsedSeconds / 60)} minutes ago`
+                            : elapsedSeconds < 86400 ? `${Math.floor(elapsedSeconds / 3600)} hours ago`
+                                : elapsedSeconds < 604800 ? `${Math.floor(elapsedSeconds / 86400)} days ago`
+                                    : elapsedSeconds < 2592000 ? `${Math.floor(elapsedSeconds / 604800)} weeks ago`
+                                        : elapsedSeconds < 31536000 ? `${Math.floor(elapsedSeconds / 2592000)} months ago`
+                                            : `${Math.floor(elapsedSeconds / 31536000)} years ago`
+            const isoTime = Number.isNaN(timestampDate.getTime()) ? '' : timestampDate.toISOString()
+            return `<tr><td><time datetime="${escapeHtml(isoTime)}" title="${escapeHtml(absoluteTime)}" aria-label="${escapeHtml(`${relativeTime}; ${absoluteTime}`)}">${escapeHtml(relativeTime)}</time></td><td class="monit-log-file">${escapeHtml(entry.file || entry.logPath)}</td><td>${escapeHtml(entry.operation)}</td><td>${escapeHtml(entry.errorType || '—')}</td><td><details><summary>Details</summary><pre>${escapeHtml(detailText)}</pre></details></td></tr>`
+        }).join('')
+        const first = payload.total ? (payload.page * payload.pageSize) + 1 : 0
+        const last = Math.min((payload.page + 1) * payload.pageSize, payload.total)
+        mainContent.innerHTML = `
+            <section class="card monit-log-view">
+                <header class="monit-log-header"><div><p class="monit-eyebrow">WORKSPACE ACTIVITY</p><h1>Logs</h1><p class="summary">Search pull, push, conflict, validation, and error events from <code>.logs</code>.</p></div><div class="monit-dashboard-actions"><label class="monit-auto-refresh"><input type="checkbox" data-log-auto-refresh ${logsAutoRefreshEnabled ? 'checked' : ''}><span class="monit-switch" aria-hidden="true"></span><span>Auto refresh</span></label><button type="button" class="btn-secondary" data-log-refresh>Refresh</button></div></header>
+                <section class="monit-log-results" aria-labelledby="monit-events-title">
+                <header class="monit-section-heading monit-events-heading"><div><p class="monit-eyebrow">HISTORY</p><h2 id="monit-events-title">Activity events</h2></div><span class="monit-event-count">${payload.total} events</span></header>
+                <form class="monit-log-filters" data-log-filters>
+                    <label>Date<input type="date" name="date" value="${escapeHtml(activeFilters.date)}"></label>
+                    <label>File path<input type="search" name="file" value="${escapeHtml(activeFilters.file)}" placeholder="Filter by file"></label>
+                    <label>Operation<select name="operation">${selectOptions(payload.operations || [], activeFilters.operation, 'operations')}</select></label>
+                    <label>Error type<select name="errorType">${selectOptions(payload.errorTypes || [], activeFilters.errorType, 'error types')}</select></label>
+                    <label class="monit-log-search">Search details<input type="search" name="search" value="${escapeHtml(activeFilters.search)}" placeholder="Message, reason, hash…"></label>
+                    <div class="monit-log-filter-actions"><button type="submit" class="btn-primary">Apply filters</button><button type="button" class="btn-secondary" data-log-clear>Clear</button></div>
+                </form>
+                <div class="monit-log-summary" aria-live="polite">Showing ${first}–${last} of ${payload.total} matching events · ${payload.dates?.length || 0} log dates</div>
+                <div class="table-scroll monit-log-table-wrap"><table class="monit-log-table"><thead><tr><th>Timestamp</th><th>File</th><th>Operation</th><th>Error type</th><th>Details</th></tr></thead><tbody>${rows || '<tr><td colspan="5">No log events match these filters.</td></tr>'}</tbody></table></div>
+                <footer class="monit-log-pagination"><button type="button" class="btn-secondary" data-log-page="${Math.max(0, payload.page - 1)}" ${payload.page <= 0 ? 'disabled' : ''}>Previous</button><span>Page ${payload.total ? payload.page + 1 : 0} of ${Math.max(1, Math.ceil(payload.total / payload.pageSize))}</span><button type="button" class="btn-secondary" data-log-page="${payload.page + 1}" ${last >= payload.total ? 'disabled' : ''}>Next</button></footer>
+                </section>
+            </section>`
+        const form = mainContent.querySelector('[data-log-filters]')
+        form?.addEventListener('submit', (event) => {
+            event.preventDefault()
+            const values = Object.fromEntries(new FormData(form).entries())
+            renderMonitLogs({ ...values, page: 0 })
+        })
+        mainContent.querySelector('[data-log-clear]')?.addEventListener('click', () => renderMonitLogs({ date: '', file: '', operation: '', errorType: '', search: '', page: 0 }))
+        mainContent.querySelector('[data-log-refresh]')?.addEventListener('click', () => renderMonitLogs({ page: activeFilters.page }))
+        mainContent.querySelector('[data-log-auto-refresh]')?.addEventListener('change', (event) => {
+            logsAutoRefreshEnabled = event.target.checked
+            try { localStorage.setItem('oa.logs.autoRefresh', String(logsAutoRefreshEnabled)) } catch { /* preference is session-only */ }
+            renderMonitLogs({ page: activeFilters.page })
+        })
+        mainContent.querySelectorAll('[data-log-page]').forEach((button) => button.addEventListener('click', () => renderMonitLogs({ page: Number(button.dataset.logPage) })))
+        if (logsAutoRefreshEnabled && currentSection === 'logs') logRefreshTimer = setTimeout(() => renderMonitLogs({ page: activeFilters.page }), 30000)
+    } catch (error) {
+        mainContent.innerHTML = `<section class="card monit-log-view"><h1>Logs</h1><p class="summary">${escapeHtml(error.message)}</p></section>`
+        if (logsAutoRefreshEnabled && currentSection === 'logs') logRefreshTimer = setTimeout(() => renderMonitLogs({ page: activeFilters.page }), 30000)
+    }
+}
 
 const renderStatusItem = (label, value, key) => {
     const item = document.createElement('span')
@@ -112,6 +196,8 @@ const getSectionLabel = (section) => {
     if (section === 'specs') return 'Specs'
     if (section === 'config') return 'Config'
     if (section === 'context') return 'Context'
+    if (section === 'monitor') return 'Monitor'
+    if (section === 'logs') return 'Logs'
     if (section === 'help') return 'Help'
     if (section === 'changelog') return 'Changelog'
     if (section === 'pinned') return 'Pinned'
@@ -185,8 +271,8 @@ const refreshTopbar = () => {
 const renderHeaderBreadcrumb = () => {
     if (!headerBreadcrumb) return
 
-    if (currentSection === 'overview') {
-        headerBreadcrumb.innerHTML = '<span>overview</span>'
+    if (currentSection === 'overview' || currentSection === 'monitor' || currentSection === 'logs') {
+        headerBreadcrumb.innerHTML = `<span>${escapeHtml(currentSection === 'overview' ? 'overview' : currentSection === 'logs' ? 'monitor logs' : 'monitor')}</span>`
         return
     }
 
@@ -212,9 +298,11 @@ const parseFragmentState = () => {
     const section = params.get('section') || ''
     const path = params.get('path') || ''
     const terminal = params.get('terminal')
+    const monit = params.get('monit') || ''
     return {
         section,
         path,
+        monit,
         terminal: terminal == null ? null : terminal !== '0'
     }
 }
@@ -225,6 +313,7 @@ const syncFragmentState = () => {
     const routePath = currentSelectedPath || currentPath
     if (routePath) params.set('path', routePath)
     params.set('terminal', isTerminalVisible ? '1' : '0')
+    if (currentMonitView) params.set('monit', currentMonitView)
     const next = `#${params.toString()}`
     if (window.location.hash !== next) {
         const previous = parseFragmentState()
@@ -262,27 +351,32 @@ const setTerminalVisibility = (visible, skipSave = false) => {
     }
 }
 
+const runWebCommand = async (command, specPath = '') => {
+    const res = await fetch('/api/exec', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command })
+    })
+    const result = await res.json()
+    contentUi?.recordSpecRunResult(command, result, specPath)
+    return result
+}
+
 const terminalUi = createTerminalUi({
     terminalHost,
     getPendingCommand: () => pendingTerminalCommand,
     setPendingCommand: (value) => {
         pendingTerminalCommand = value
     },
-    onExecute: async (command) => {
-        const res = await fetch('/api/exec', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ command })
-        })
-        return res.json()
-    }
+    onExecute: runWebCommand
 })
 
-const contentUi = createContentUi({
+contentUi = createContentUi({
     mainContent,
     cardCommands,
     commandIcons,
     onUseCommand: (command) => terminalUi.setCommand(command),
+    onRunSpecCommand: runWebCommand,
     onAddLocalPath: (relativePath) => terminalUi.upsertLocalPath(relativePath),
     isPinned: (filePath) => pinnedPaths.includes(filePath),
     onTogglePin: async (filePath) => {
@@ -390,11 +484,11 @@ const runSyncAction = async ({ action, path: targetPath }) => {
     }
 }
 
-const saveMeta = async ({ path, metaFile, meta, schemaType }) => {
+const saveMeta = async ({ path, metaFile, meta }) => {
     const res = await fetch('/api/meta', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path, metaFile, meta, schemaType })
+        body: JSON.stringify({ path, metaFile, meta })
     })
     return res.json()
 }
@@ -1050,6 +1144,14 @@ const init = async () => {
         if (!button) return
         const root = button.dataset.root
         if (root === currentRoot) {
+            if (root === 'logs') {
+                await renderMonitLogs()
+                return
+            }
+            if (root === 'monitor') {
+                await renderMonitorDashboard()
+                return
+            }
             isExplorerVisible = !isExplorerVisible
             syncActivityBar()
             return
@@ -1060,6 +1162,24 @@ const init = async () => {
         if (root === 'home') {
             await openOverview()
             await renderDirectoryNav('', 'overview')
+        } else if (root === 'logs') {
+            currentSection = 'logs'
+            currentMonitView = ''
+            currentPath = ''
+            currentSelectedPath = ''
+            isExplorerVisible = false
+            syncActivityBar()
+            syncFragmentState()
+            await renderMonitLogs({ page: 0 })
+        } else if (root === 'monitor') {
+            currentSection = 'monitor'
+            currentMonitView = ''
+            currentPath = ''
+            currentSelectedPath = ''
+            isExplorerVisible = false
+            syncActivityBar()
+            syncFragmentState()
+            await renderMonitorDashboard()
         } else if (root === 'data' || root === 'specs') {
             const rootPath = getRootPathForSection(root)
             await openDirectory(rootPath, root)
@@ -1091,6 +1211,25 @@ const init = async () => {
 
     const renderFragmentRoute = async (fragmentState) => {
         if (fragmentState.terminal != null) isTerminalVisible = Boolean(fragmentState.terminal)
+        if (fragmentState.section !== 'logs') {
+            if (logRefreshTimer) clearTimeout(logRefreshTimer)
+            logRefreshTimer = null
+        }
+        if (fragmentState.section !== 'monitor' && fragmentState.monit !== 'conflicts') {
+            if (monitorRefreshTimer) clearTimeout(monitorRefreshTimer)
+            monitorRefreshTimer = null
+        }
+        if (fragmentState.monit === 'conflicts') {
+            currentMonitView = ''
+            currentRoot = 'monitor'
+            currentSection = 'monitor'
+            await renderMonitorDashboard()
+            isExplorerVisible = false
+            syncActivityBar()
+            setTerminalVisibility(isTerminalVisible, true)
+            return
+        }
+        currentMonitView = ''
         const section = fragmentState.section || 'overview'
         const pathFromHash = fragmentState.path || ''
         if (section === 'data') {
@@ -1107,8 +1246,25 @@ const init = async () => {
         } else if (section === 'specs') {
             currentRoot = 'specs'
             const root = getRootPathForSection('specs')
-            await openDirectory(pathFromHash || root, 'specs')
-            await renderDirectoryNav(pathFromHash || root, 'specs')
+            const isSpecFilePath = pathFromHash.toLowerCase().endsWith('.json')
+            const directoryPath = isSpecFilePath && pathFromHash.includes('/')
+                ? pathFromHash.slice(0, pathFromHash.lastIndexOf('/'))
+                : pathFromHash || root
+            const selectedPath = isSpecFilePath ? pathFromHash : ''
+            await openDirectory(directoryPath, 'specs', selectedPath)
+            await renderDirectoryNav(directoryPath, 'specs')
+        } else if (section === 'logs') {
+            currentRoot = 'logs'
+            currentSection = 'logs'
+            currentPath = ''
+            currentSelectedPath = ''
+            await renderMonitLogs()
+        } else if (section === 'monitor') {
+            currentRoot = 'monitor'
+            currentSection = 'monitor'
+            currentPath = ''
+            currentSelectedPath = ''
+            await renderMonitorDashboard()
         } else if (section === 'config') {
             currentRoot = 'preferences'
             await openConfig()
@@ -1135,9 +1291,152 @@ const init = async () => {
             await renderDirectoryNav('', 'overview')
         }
 
-        isExplorerVisible = true
+        isExplorerVisible = !['logs', 'monitor'].includes(section)
         syncActivityBar()
         setTerminalVisibility(isTerminalVisible, true)
+    }
+
+    const renderMonitorDashboard = async () => {
+        if (monitorRefreshTimer) clearTimeout(monitorRefreshTimer)
+        monitorRefreshTimer = null
+        mainContent.innerHTML = '<section class="card monit-dashboard"><h1>Monitor</h1><p class="summary">Loading monitor status and queue…</p></section>'
+        try {
+            const response = await fetch('/api/monit')
+            const payload = await response.json()
+            if (!response.ok || !payload.ok) throw new Error(payload.error || 'Unable to load monitor records.')
+            const status = payload.status
+            const formatTime = (value) => {
+                if (!value) return 'Not available'
+                const date = new Date(value)
+                return Number.isNaN(date.getTime()) ? 'Not available' : date.toLocaleString()
+            }
+            const conflictRows = (payload.conflicts || []).map((item) => {
+                const viewerPath = item.contentPath || `$content/${String(item.path || '').replace(/\\/g, '/').split('/data/').pop()}`
+                const href = `#section=data&path=${encodeURIComponent(viewerPath)}`
+                return `<tr><td><a href="${escapeHtml(href)}">${escapeHtml(item.relativePath || item.path)}</a></td><td>${escapeHtml(item.reason || 'Conflict')}</td><td>${escapeHtml(item.detectedAt || '')}</td></tr>`
+            }).join('')
+            const renderQueueItem = (item) => {
+                const approval = item.kind === 'new-file'
+                    ? `<code>oa monit "${escapeHtml(item.monitorFolder || 'data')}" --approve "${escapeHtml(item.relativePath || '')}"</code>`
+                    : '<span>Push is automatic at the next configured push interval.</span>'
+                const relativeFile = String(item.relativePath || '').replace(/\\/g, '/')
+                const contentPath = relativeFile.startsWith('data/') ? `$content/${relativeFile.slice('data/'.length)}` : ''
+                const openFile = contentPath
+                    ? `<a class="monit-task-link" href="#section=data&path=${encodeURIComponent(contentPath)}">Open file</a>`
+                    : '<span class="monit-task-link is-disabled">File path unavailable</span>'
+                const approveAction = item.kind === 'new-file' && item.status === 'awaiting-approval'
+                    ? `<button type="button" class="monit-approve-button" data-monitor-approve="${escapeHtml(item.relativePath || '')}">Approve and push full file</button>`
+                    : ''
+                const summary = item.summary || item.message || (item.kind === 'new-file'
+                    ? 'New local file; no remote write will happen until it is approved.'
+                    : item.kind === 'push'
+                        ? 'Validated local changes are queued for a full-file push.'
+                        : 'Review this queued monitor task.')
+                const details = { ...item }
+                delete details.suggestedRemote
+                return `<details class="monit-queue-item"><summary><span class="monit-queue-file"><strong>${escapeHtml(item.relativePath || item.path)}</strong><small>${escapeHtml(summary)}</small></span><span class="monit-queue-kind">${escapeHtml(item.kind || 'task')}</span><span class="monit-task-status">${escapeHtml(item.status || 'queued')}</span><span class="monit-queue-time">${escapeHtml(formatTime(item.detectedAt || item.queuedAt))}</span><span class="monit-expand-label">Details</span></summary><div class="monit-queue-details"><div><h4>Task summary</h4><p>${escapeHtml(summary)}</p><dl><div><dt>Task</dt><dd>${escapeHtml(item.kind || 'task')}</dd></div><div><dt>Status</dt><dd>${escapeHtml(item.status || 'queued')}</dd></div><div><dt>Queued</dt><dd>${escapeHtml(formatTime(item.detectedAt || item.queuedAt))}</dd></div></dl><div class="monit-task-actions">${openFile}${approveAction}</div></div><div><h4>Remote mapping and action</h4><pre class="monit-meta">${escapeHtml(JSON.stringify(item.suggestedRemote || {}, null, 2))}</pre>${approval}</div><details class="monit-raw-details"><summary>Raw task record</summary><pre class="monit-meta">${escapeHtml(JSON.stringify(details, null, 2))}</pre></details></div></details>`
+            }
+            const queueGroups = new Map()
+            for (const item of payload.pending || []) {
+                const key = String(item.status || 'queued').trim().toLowerCase() || 'queued'
+                if (!queueGroups.has(key)) queueGroups.set(key, [])
+                queueGroups.get(key).push(item)
+            }
+            const statusLabel = (status) => ({
+                'awaiting-approval': 'Awaiting approval',
+                queued: 'Queued',
+                processing: 'Processing',
+                blocked: 'Blocked',
+                failed: 'Failed'
+            })[status] || status.replace(/[-_]+/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())
+            const queueItems = [...queueGroups.entries()]
+                .sort(([a], [b]) => statusLabel(a).localeCompare(statusLabel(b)))
+                .map(([status, items]) => `<section class="monit-queue-group" aria-label="${escapeHtml(statusLabel(status))}: ${items.length} tasks"><header><h3>${escapeHtml(statusLabel(status))}</h3><span>${items.length} ${items.length === 1 ? 'task' : 'tasks'}</span></header><div class="monit-queue-group-items">${items.map(renderQueueItem).join('')}</div></section>`)
+                .join('')
+            const queueCount = payload.pending?.length || 0
+            const countForStatus = (status) => queueGroups.get(status)?.length || 0
+            const statusBreakdown = ['awaiting-approval', 'queued', 'processing', 'blocked', 'failed']
+                .map((status) => `<span>${escapeHtml(statusLabel(status))}<b>${countForStatus(status)}</b></span>`)
+                .join('')
+            const readyTaskCount = (payload.pending || []).filter((item) => (item.kind === 'push' && item.status === 'queued')
+                || (item.kind === 'new-file' && item.status === 'awaiting-approval')).length
+            mainContent.innerHTML = `
+                <section class="card monit-dashboard">
+                    <header class="monit-dashboard-header"><div><p class="monit-eyebrow">REMOTE SYNC</p><h1>Monitor</h1><p class="summary">Track the active folder, scheduled runs, pending work, and conflicts.</p></div><div class="monit-dashboard-actions"><label class="monit-auto-refresh"><input type="checkbox" data-monitor-auto-refresh ${monitorAutoRefreshEnabled ? 'checked' : ''}><span class="monit-switch" aria-hidden="true"></span><span>Auto refresh</span></label><button type="button" class="btn-secondary" data-monitor-flush ${readyTaskCount ? '' : 'disabled'} ${readyTaskCount ? '' : 'aria-disabled="true"'}>Flush queue <span class="monit-flush-count">${readyTaskCount}</span></button><a class="btn-secondary" href="#section=logs&terminal=${isTerminalVisible ? '1' : '0'}">View logs</a><button type="button" class="btn-secondary" data-monitor-refresh><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16 6V2m0 4h-4M4 14v4m0-4h4"/><path d="M5.2 7a5.5 5.5 0 0 1 9-1L16 8M4 12l1.8 2a5.5 5.5 0 0 0 9-1"/></svg>Refresh</button></div></header>
+                    <section class="monit-status-panel" aria-labelledby="monit-status-title">
+                        <header class="monit-section-heading"><div><p class="monit-eyebrow">SYNC STATUS</p><h2 id="monit-status-title">Schedule</h2></div><span class="monit-running-badge ${status?.active ? 'is-active' : ''}"><span aria-hidden="true"></span>${status?.active ? 'Running' : 'Not running'}</span></header>
+                        <div class="monit-status-grid">
+                            <div class="monit-folder-stat"><span>Monitoring</span><strong>${escapeHtml(status?.folder || 'No folder recorded')}</strong></div>
+                            <div class="monit-queue-stat"><span>Tasks in queue</span><strong>${queueCount}</strong><small class="monit-queue-status-counts">${statusBreakdown}</small></div>
+                            <div><span>Last completed scan</span><strong>${escapeHtml(formatTime(status?.lastRunAt))}</strong></div>
+                            <div><span>Next scheduled run</span><strong>${escapeHtml(status?.active ? formatTime(status.nextRunAt) : '—')}</strong></div>
+                        </div>
+                    </section>
+                    <section class="monit-dashboard-section" aria-labelledby="monit-queue-title">
+                        <header class="monit-section-heading"><div><p class="monit-eyebrow">PENDING WORK</p><h2 id="monit-queue-title">Queue</h2></div></header>
+                        <p class="summary">Expand a task to review its summary, remote mapping, and approval details.</p>
+                        <p class="monit-feedback" data-monitor-feedback aria-live="polite"></p>
+                        <div class="monit-queue-list">${queueItems || '<p class="monit-empty-row">Queue is clear. No pending tasks.</p>'}</div>
+                    </section>
+                    <section class="monit-dashboard-section" aria-labelledby="monit-conflicts-title">
+                        <header class="monit-section-heading"><div><p class="monit-eyebrow">NEEDS ATTENTION</p><h2 id="monit-conflicts-title">Conflicts</h2></div><span class="monit-queue-count">${payload.conflicts?.length || 0}</span></header>
+                        <p class="summary">Open a file to compare local and remote content. Conflict records are stored in the file metadata.</p>
+                        <div class="table-scroll monit-queue-table"><table><thead><tr><th>File</th><th>Reason</th><th>Detected</th></tr></thead><tbody>${conflictRows || '<tr><td colspan="3" class="monit-empty-row">No unresolved conflicts.</td></tr>'}</tbody></table></div>
+                    </section>
+                </section>`
+            mainContent.querySelector('[data-monitor-refresh]')?.addEventListener('click', renderMonitorDashboard)
+            mainContent.querySelector('[data-monitor-flush]')?.addEventListener('click', async (event) => {
+                const button = event.currentTarget
+                if (!readyTaskCount) return
+                if (!window.confirm(`Flush ${readyTaskCount} queue task${readyTaskCount === 1 ? '' : 's'} now? This approves and pushes complete files awaiting approval, and processes queued full-file pushes. Schema validation runs before each push.`)) return
+                button.disabled = true
+                const feedback = mainContent.querySelector('[data-monitor-feedback]')
+                if (feedback) feedback.textContent = 'Flushing queue tasks…'
+                try {
+                    const flushResponse = await fetch('/api/monit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'flush' }) })
+                    const result = await flushResponse.json()
+                    if (!flushResponse.ok || !result.ok) throw new Error(result.error || 'Queue flush failed.')
+                    await renderMonitorDashboard()
+                    const refreshedFeedback = mainContent.querySelector('[data-monitor-feedback]')
+                    if (refreshedFeedback) refreshedFeedback.textContent = result.message || `Processed ${result.processed || 0} ready task${result.processed === 1 ? '' : 's'}.`
+                } catch (error) {
+                    button.disabled = false
+                    if (feedback) feedback.textContent = error.message || 'Queue flush failed.'
+                }
+            })
+            mainContent.querySelectorAll('[data-monitor-approve]').forEach((button) => button.addEventListener('click', async () => {
+                const filePath = button.dataset.monitorApprove
+                if (!window.confirm(`Approve and push the complete local file to its mapped remote resource?\n\n${filePath}`)) return
+                button.disabled = true
+                const feedback = mainContent.querySelector('[data-monitor-feedback]')
+                if (feedback) feedback.textContent = `Approving and pushing ${filePath}…`
+                try {
+                    const approvalResponse = await fetch('/api/monit', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'approve', path: filePath })
+                    })
+                    const approvalResult = await approvalResponse.json()
+                    if (!approvalResponse.ok || !approvalResult.ok) throw new Error(approvalResult.error || 'Approval failed.')
+                    await renderMonitorDashboard()
+                    const refreshedFeedback = mainContent.querySelector('[data-monitor-feedback]')
+                    if (refreshedFeedback) refreshedFeedback.textContent = `Approved and pushed the full file: ${filePath}`
+                } catch (error) {
+                    button.disabled = false
+                    if (feedback) feedback.textContent = error.message || 'Approval failed.'
+                }
+            }))
+            mainContent.querySelector('[data-monitor-auto-refresh]')?.addEventListener('change', (event) => {
+                monitorAutoRefreshEnabled = event.target.checked
+                try { localStorage.setItem('oa.monitor.autoRefresh', String(monitorAutoRefreshEnabled)) } catch { /* preference is session-only */ }
+                renderMonitorDashboard()
+            })
+            if (monitorAutoRefreshEnabled && currentSection === 'monitor') {
+                monitorRefreshTimer = setTimeout(renderMonitorDashboard, 30000)
+            }
+        } catch (error) {
+            mainContent.innerHTML = `<section class="card monit-dashboard"><h1>Monitor</h1><p class="summary">${escapeHtml(error.message)}</p></section>`
+        }
     }
 
     window.addEventListener('popstate', async () => {
@@ -1147,6 +1446,11 @@ const init = async () => {
         } finally {
             isRestoringHistory = false
         }
+    })
+    window.addEventListener('hashchange', async () => {
+        isRestoringHistory = true
+        try { await renderFragmentRoute(parseFragmentState()) }
+        finally { isRestoringHistory = false }
     })
 
     await renderFragmentRoute(parseFragmentState())

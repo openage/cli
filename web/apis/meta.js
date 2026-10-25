@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { readJsonBody, sendJson } from './common.js'
+import { resolveEndpointForFile, endpointSchemaPath } from '../../lib/helpers/schema-validation.js'
 
 const normalizeMetaFileName = (name, fallback = 'meta.json') => {
     const raw = String(name || '').trim()
@@ -43,43 +44,6 @@ const buildRemoteMapping = (folderSegments, inheritedRemote = {}, currentRemote 
         ...(Object.keys(query).length ? { query } : {}),
         ...(id ? { id } : {})
     }
-}
-
-const getSchemasIndexPath = (file) => file.path('$oa/schemas/index.json')
-
-const readSchemasIndex = (file) => {
-    const schemasPath = getSchemasIndexPath(file)
-    const parsed = readJsonIfExists(schemasPath, {})
-    return {
-        path: schemasPath,
-        data: {
-            items: Array.isArray(parsed.items) ? parsed.items : [],
-            mappings: parsed.mappings && typeof parsed.mappings === 'object' ? parsed.mappings : {}
-        }
-    }
-}
-
-const writeSchemasIndex = (file, data) => {
-    const schemasPath = getSchemasIndexPath(file)
-    fs.mkdirSync(path.dirname(schemasPath), { recursive: true })
-    fs.writeFileSync(schemasPath, JSON.stringify(data, null, 2), 'utf8')
-}
-
-const normalizeSchemaOptions = (items) => {
-    return (Array.isArray(items) ? items : [])
-        .map((item) => {
-            if (typeof item === 'string') {
-                return { value: item, label: item }
-            }
-            if (item && typeof item === 'object') {
-                const value = String(item.code || item.type || item.id || item.value || '').trim()
-                if (!value) return null
-                const label = String(item.name || item.title || item.label || value).trim()
-                return { value, label }
-            }
-            return null
-        })
-        .filter(Boolean)
 }
 
 const resolveMetaBase = (resolvedTarget, file, withinFolder) => {
@@ -137,55 +101,54 @@ const getMetaPayload = ({ configFolder, targetPath, requestedMetaFile, resolveAp
                 ? relativeFolder.split(path.sep).filter(Boolean)
                 : []
             try {
-                fs.writeFileSync(selectedMetaPath, `${JSON.stringify(folderSegments.length >= 2 ? { remote: { service: folderSegments[0], collection: folderSegments[1] } } : {}, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' })
+                const parentRemote = folderSegments.length >= 2
+                    ? getFolderRemote(metaRoot, folderSegments.slice(0, -1))
+                    : {}
+                const folderRemote = folderSegments.length >= 2
+                    ? buildRemoteMapping(folderSegments, parentRemote, {})
+                    : null
+                fs.writeFileSync(selectedMetaPath, `${JSON.stringify(folderRemote ? { remote: folderRemote } : {}, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' })
             } catch (error) {
                 if (error.code !== 'EEXIST') throw error
             }
         }
     }
-    if (targetType === 'directory' && selectedMetaFile === 'index.json' && base.kind === 'content') {
-        const folderSegments = relativeFolder.split(path.sep).filter(Boolean)
-        const currentMeta = readJsonIfExists(selectedMetaPath, {})
-        if (folderSegments.length >= 2) {
-            const parentRemote = getFolderRemote(metaRoot, folderSegments.slice(0, -1))
-            const currentRemote = currentMeta.remote || currentMeta.remotes?.origin || {}
-            const folderMapping = buildRemoteMapping(folderSegments, parentRemote, currentRemote)
-            currentMeta.remote = folderMapping
-            delete currentMeta.remotes
-            fs.writeFileSync(selectedMetaPath, `${JSON.stringify(currentMeta, null, 2)}\n`, 'utf8')
-        }
-    }
     if (targetType === 'file' && base.kind === 'content' && path.extname(resolvedTarget).toLowerCase() === '.json') {
         const folderSegments = relativeFolder.split(path.sep).filter(Boolean)
         const parentRemote = getFolderRemote(metaRoot, folderSegments)
+        const hasFileMeta = fs.existsSync(selectedMetaPath)
         const currentMeta = readJsonIfExists(selectedMetaPath, {})
         const currentRemote = currentMeta.remote || currentMeta.remotes?.origin || {}
         const fileData = readJsonIfExists(resolvedTarget, {})
         const id = fileData?.id || fileData?.code || currentRemote.id || ''
-        const fileMapping = buildRemoteMapping(folderSegments, parentRemote, currentRemote, id)
-        if (fileMapping) {
+        const hasExistingMapping = Boolean(currentRemote.service && currentRemote.collection)
+        const fileMapping = !hasExistingMapping ? buildRemoteMapping(folderSegments, parentRemote, currentRemote, id) : null
+        if (fileMapping || (hasExistingMapping && !currentRemote.id && id)) {
             const metaRootAbs = path.resolve(metaRoot)
             const metaFolderAbs = path.resolve(metaFolder)
             if (!withinFolder(metaRootAbs, metaFolderAbs)) {
                 return { ok: false, error: 'Invalid meta folder.' }
             }
             fs.mkdirSync(metaFolderAbs, { recursive: true })
-            currentMeta.remote = fileMapping
-            delete currentMeta.remotes
-            fs.writeFileSync(selectedMetaPath, `${JSON.stringify(currentMeta, null, 2)}\n`, 'utf8')
+            if (fileMapping) {
+                currentMeta.remote = fileMapping
+                delete currentMeta.remotes
+            } else if (currentMeta.remote) {
+                currentMeta.remote = { ...currentMeta.remote, id }
+            } else if (currentMeta.remotes?.origin) {
+                currentMeta.remotes = { ...currentMeta.remotes, origin: { ...currentMeta.remotes.origin, id } }
+            }
+            fs.writeFileSync(selectedMetaPath, `${JSON.stringify(currentMeta, null, 2)}\n`, hasFileMeta ? 'utf8' : { encoding: 'utf8', flag: 'wx' })
         }
     }
     const availableMetaFiles = fs.existsSync(metaFolder)
         ? fs.readdirSync(metaFolder).filter((name) => name.toLowerCase().endsWith('.json')).sort((a, b) => a.localeCompare(b))
         : []
     const meta = readJsonIfExists(selectedMetaPath, {})
-    const schemaPath = path.join(metaFolder, 'schema.json')
-    const schema = readJsonIfExists(schemaPath, {})
-    const schemasIndex = readSchemasIndex(file).data
-    const schemaOptions = normalizeSchemaOptions(schemasIndex.items)
-    const mappingKey = toPosix(targetPath)
-    const mappedSchemaType = String(schemasIndex.mappings?.[mappingKey] || '').trim()
-    const schemaType = mappedSchemaType || String(schema?.type ?? schema?.code ?? schema?.schema ?? '')
+    const endpoint = targetType === 'file' ? resolveEndpointForFile(resolvedTarget) : null
+    const endpointSchema = endpoint ? endpointSchemaPath(endpoint.service, endpoint.collection) : null
+    const schemaFile = endpoint ? `.oa/schemas/${endpoint.service}.${endpoint.collection}.schema.json` : null
+    const schema = endpointSchema && fs.existsSync(endpointSchema) ? readJsonIfExists(endpointSchema, {}) : {}
 
     return {
         ok: true,
@@ -197,9 +160,8 @@ const getMetaPayload = ({ configFolder, targetPath, requestedMetaFile, resolveAp
         availableMetaFiles,
         meta,
         schema,
-        mappedSchemaType,
-        schemaOptions,
-        schemaType: String(schemaType || '')
+        schemaFile,
+        schemaEndpoint: endpoint ? `${endpoint.service}/${endpoint.collection}` : null
     }
 }
 
@@ -255,15 +217,6 @@ export const handleMetaApi = ({ req, res, port, configFolder, resolveApiDirector
                 if (Object.prototype.hasOwnProperty.call(payload, 'meta')) {
                     const metaFileName = normalizeMetaFileName(metaState.selectedMetaFile)
                     fs.writeFileSync(path.join(metaFolderAbs, metaFileName), JSON.stringify(payload.meta && typeof payload.meta === 'object' ? payload.meta : {}, null, 2), 'utf8')
-                }
-
-                if (Object.prototype.hasOwnProperty.call(payload, 'schemaType')) {
-                    const nextType = String(payload.schemaType || '').trim()
-                    const schemasIndex = readSchemasIndex(file).data
-                    const mappingKey = toPosix(targetPath)
-                    if (nextType) schemasIndex.mappings[mappingKey] = nextType
-                    else delete schemasIndex.mappings[mappingKey]
-                    writeSchemasIndex(file, schemasIndex)
                 }
 
                 const refreshed = getMetaPayload({ configFolder, targetPath, requestedMetaFile: payload.metaFile, resolveApiDirectoryTarget, withinFolder, file, toPosix })

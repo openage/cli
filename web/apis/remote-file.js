@@ -1,6 +1,7 @@
 import path from 'path'
 import fs from 'fs'
 import { readJsonBody, sendJson } from './common.js'
+import { validateContent } from '../../lib/helpers/schema-validation.js'
 
 const resolveMappedFile = ({ targetPath, configFolder, resolveApiDirectoryTarget, withinFolder, file }) => {
     const resolved = resolveApiDirectoryTarget(configFolder, targetPath)
@@ -44,9 +45,11 @@ const readRemote = async (remote, readResource = null) => {
     return { data, content: JSON.stringify(data, null, 2) }
 }
 
+const getStatusCode = (error) => error?.status || error?.statusCode || error?.response?.status || error?.cause?.details?.status || error?.cause?.response?.status || null
+
 const getRemoteVersion = (data) => data?.version || data?.timeStamp || data?.timestamp || data?.updatedAt || data?.modifiedAt || null
 
-const persistRemoteMeta = (file, local, remoteName, mapping, data, baseSnapshot = undefined) => {
+const persistRemoteMeta = (file, local, remoteName, mapping, data, { baseSnapshot = undefined, pushedAt = null } = {}) => {
     const id = data?.code || data?.id || mapping.id
     const existing = file.meta(id, local) || {}
     const allRemotes = { ...(existing.remotes || {}), [remoteName]: mapping }
@@ -59,6 +62,7 @@ const persistRemoteMeta = (file, local, remoteName, mapping, data, baseSnapshot 
         timestamp: data?.timeStamp ? new Date(data.timeStamp) : new Date(),
         local,
         remotes: allRemotes,
+        ...(pushedAt ? { pushedAt } : {}),
         ...(baseSnapshot ? { baseSnapshot } : {})
     }
     file.meta(id, local, next)
@@ -88,17 +92,23 @@ export const handleRemoteFileApi = async ({ req, res, port, configFolder, resolv
                 const { data, content } = await readRemote(mapped.remote, readRemoteResource)
                 fs.writeFileSync(mapped.resolved, content, 'utf8')
                 const pulledAt = new Date().toISOString()
-                persistRemoteMeta(file, mapped.local, 'origin', mapped.remote, data, {
+                persistRemoteMeta(file, mapped.local, 'origin', mapped.remote, data, { baseSnapshot: {
                     content,
                     pulledAt,
                     version: getRemoteVersion(data),
                     remote: { service: mapped.remote.service, collection: mapped.remote.collection, query: mapped.remote.query, id: mapped.remote.id }
-                })
+                } })
                 sendJson(res, 200, { ok: true, action, path: toPosix(targetPath), content, pulledAt, version: getRemoteVersion(data) })
                 return true
             }
             if (action === 'push') {
-                const localData = JSON.parse(fs.readFileSync(mapped.resolved, 'utf8'))
+                const localText = fs.readFileSync(mapped.resolved, 'utf8')
+                const validation = await validateContent(mapped.resolved, localText, mapped.remote)
+                if (!validation.valid) {
+                    sendJson(res, 422, { ok: false, error: 'Push blocked by endpoint schema validation.', schema: validation.schema, schemaFile: validation.schemaFile, errors: validation.errors })
+                    return true
+                }
+                const localData = JSON.parse(localText)
                 if (!writeRemoteResource) writeRemoteResource = (await import('../../lib/helpers/request.js')).write
                 const updated = await writeRemoteResource({ type: 'http', config: mapped.remote }, localData)
                 if (!updated) throw new Error('The remote service did not confirm the full-file push.')
@@ -108,16 +118,35 @@ export const handleRemoteFileApi = async ({ req, res, port, configFolder, resolv
                     query: mapped.remote.query,
                     id: updated?.id || updated?.code || mapped.remote.id
                 }
-                persistRemoteMeta(file, mapped.local, 'origin', nextMapping, updated || localData)
-                sendJson(res, 200, { ok: true, action, path: toPosix(targetPath), mapping: nextMapping })
+                const pushedAt = new Date().toISOString()
+                persistRemoteMeta(file, mapped.local, 'origin', nextMapping, updated || localData, { pushedAt })
+                sendJson(res, 200, { ok: true, action, path: toPosix(targetPath), mapping: nextMapping, pushedAt })
                 return true
             }
             sendJson(res, 400, { ok: false, error: 'Action must be pull or push.' })
             return true
         }
-        const { data, content } = await readRemote(mapped.remote, readRemoteResource)
+        let remoteResult
+        try {
+            remoteResult = await readRemote(mapped.remote, readRemoteResource)
+        } catch (error) {
+            if (getStatusCode(error) === 404) {
+                sendJson(res, 200, {
+                    ok: true,
+                    exists: false,
+                    path: toPosix(targetPath),
+                    content: '',
+                    mapping: { service: mapped.remote.service, collection: mapped.remote.collection, id: mapped.remote.id, discovered: mapped.discovered },
+                    fetchedAt: new Date().toISOString()
+                })
+                return true
+            }
+            throw error
+        }
+        const { data, content } = remoteResult
         sendJson(res, 200, {
             ok: true,
+            exists: true,
             path: toPosix(targetPath),
             content,
             mapping: { service: mapped.remote.service, collection: mapped.remote.collection, id: mapped.remote.id, discovered: mapped.discovered },

@@ -11,6 +11,7 @@ The `oa config` handler gets or sets values. Values are stored as plain JSON unl
 ## Use cases
 
 - Set the default log level with `oa config logger.level debug`.
+- Configure `oa monit` polling independently with `oa config monit.pullIntervalMinutes 5` and `oa config monit.pushIntervalMinutes 5` (both default to five minutes).
 - Keep different service or application settings for development and production.
 - Encrypt a sensitive setting when storing it using `oa config <key> <value> --encrypt`.
 - Inspect a setting without manually editing JSON.
